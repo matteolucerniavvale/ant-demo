@@ -128,16 +128,19 @@
       /* MANUAL PRODUCT SELECTOR (Bottom Center) - Hidden by default */
       .product-selector {
         position: absolute;
-        bottom: 20px;
+        bottom: 30px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 2;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.85);
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 12px;
-        padding: 10px;
-        display: none; /* Hidden unless in Webcam Mode */
-        gap: 8px;
+        padding: 12px;
+        display: none; /* Hidden unless in Webcam Mode AND Publishing */
+        gap: 10px;
+        max-width: 90vw;
+        flex-wrap: wrap;
+        justify-content: center;
       }
       .product-selector.visible {
         display: flex;
@@ -146,21 +149,33 @@
         background: #333;
         border: 1px solid #555;
         color: white;
-        padding: 8px 12px;
-        border-radius: 6px;
+        padding: 6px 12px 6px 6px;
+        border-radius: 8px;
         cursor: pointer;
-        font-size: 12px;
-        max-width: 100px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 13px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition:
+          background 0.2s,
+          transform 0.1s;
       }
       .prod-btn:hover {
-        background: #555;
+        background: #444;
+        transform: translateY(-2px);
       }
       .prod-btn.active {
         background: #22a046;
         border-color: #4ade80;
+        box-shadow: 0 4px 12px rgba(34, 160, 70, 0.4);
+      }
+      .prod-btn img {
+        width: 40px;
+        height: 28px;
+        object-fit: cover;
+        border-radius: 4px;
+        display: block;
       }
     </style>
   </head>
@@ -217,7 +232,7 @@
       var webRTCAdaptor;
       var isPublishing = false;
       var isBgPlaying = false;
-      var isWebcamMode = false; // NEW STATE
+      var isWebcamMode = false;
       var syncInterval = null;
       var currentManualIndex = 0;
 
@@ -229,11 +244,29 @@
         { name: "Hexagonal Flat", brand: "Ray-Ban" },
       ];
 
+      const carouselSources = [
+        "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1577803645773-f96470509666?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1509695507497-903c140c43b0?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=200&h=120&fit=crop",
+      ];
+
       // --- SETUP PRODUCT BUTTONS ---
       products.forEach((p, idx) => {
         const btn = document.createElement("button");
         btn.className = "prod-btn";
-        btn.textContent = p.name;
+
+        const img = document.createElement("img");
+        img.src = carouselSources[idx];
+        img.alt = p.name;
+
+        const span = document.createElement("span");
+        span.textContent = p.name;
+
+        btn.appendChild(img);
+        btn.appendChild(span);
+
         btn.onclick = () => setManualProduct(idx);
         productSelector.appendChild(btn);
       });
@@ -257,7 +290,7 @@
           canvas.width = targetW;
           canvas.height = targetH;
         }
-        // ... (resize CSS logic remains same)
+
         var ratio = canvas.width / canvas.height;
         var winW = window.innerWidth;
         var winH = window.innerHeight;
@@ -273,13 +306,12 @@
       window.addEventListener("resize", resizeCanvas);
 
       navigator.mediaDevices
-        .getUserMedia({ video: { width: 1280, height: 720 } }) // Requested higher res for fullscreen
+        .getUserMedia({ video: { width: 1280, height: 720 } })
         .then((stream) => {
           webcam.srcObject = stream;
         })
         .catch((err) => console.error(err));
 
-      // Helper to simulate object-fit: cover on Canvas
       function drawWebcamCover() {
         if (webcam.readyState < 2) return;
 
@@ -288,11 +320,6 @@
         const vw = webcam.videoWidth;
         const vh = webcam.videoHeight;
 
-        const r = Math.min(cw / vw, ch / vh);
-        const nw = vw * r; // new width (contain)
-        const nh = vh * r; // new height (contain)
-
-        // Logic for COVER
         let scale = Math.max(cw / vw, ch / vh);
         let x = cw / 2 - (vw / 2) * scale;
         let y = ch / 2 - (vh / 2) * scale;
@@ -305,14 +332,11 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         if (isWebcamMode) {
-          // --- WEBCAM MODE: Full Screen Webcam Only ---
           drawWebcamCover();
         } else {
-          // --- VIDEO MODE: Background + Small Webcam ---
           if (videoBg.readyState >= 2) {
             ctx.drawImage(videoBg, 0, 0, canvas.width, canvas.height);
           }
-          // Small webcam top right
           const camWidth = 550;
           const camHeight = 400;
           if (webcam.readyState >= 2) {
@@ -338,7 +362,28 @@
         if (!webRTCAdaptor) initWebRTC();
       });
 
-      // --- LOGIC FOR WISHLIST LOG (Same as before) ---
+      // --- UI UPDATE FUNCTION (Centralized Logic) ---
+      function updateUI() {
+        // Logic for Mode Button and Video Controls
+        if (isWebcamMode) {
+          modeToggle.textContent = "Switch to Video Mode";
+          modeToggle.classList.add("active-blue");
+          videoControls.style.display = "none";
+        } else {
+          modeToggle.textContent = "Switch to Webcam Mode";
+          modeToggle.classList.remove("active-blue");
+          videoControls.style.display = "flex";
+        }
+
+        // Logic for Product Selector Visibility
+        // Show ONLY if Webcam Mode AND Publishing are true
+        if (isWebcamMode && isPublishing) {
+          productSelector.classList.add("visible");
+        } else {
+          productSelector.classList.remove("visible");
+        }
+      }
+
       function addLogItem(productIndex) {
         if (emptyMsg) emptyMsg.style.display = "none";
         const product = products[productIndex];
@@ -379,6 +424,8 @@
                 }, 500);
                 startSyncHeartbeat();
               }
+
+              updateUI(); // Check visibility of tools
             }
             if (info === "publish_finished") {
               isPublishing = false;
@@ -386,6 +433,8 @@
               publishToggle.classList.remove("active-red");
               stopSyncHeartbeat();
               videoBg.pause();
+
+              updateUI(); // Check visibility of tools
             }
             if (info === "data_received") {
               try {
@@ -402,6 +451,7 @@
             publishToggle.classList.remove("active-red");
             stopSyncHeartbeat();
             videoBg.pause();
+            updateUI();
           },
         });
       }
@@ -410,7 +460,6 @@
         if (syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(() => {
           if (isPublishing && !isWebcamMode) {
-            // In Video mode, sync play/pause status
             const action = isBgPlaying ? "play" : "pause";
             sendSyncData(action);
           }
@@ -435,40 +484,24 @@
         }
       }
 
-      // --- UI EVENT LISTENERS ---
-
       modeToggle.addEventListener("click", () => {
         isWebcamMode = !isWebcamMode;
 
         if (isWebcamMode) {
-          // Switch TO Webcam Mode
-          modeToggle.textContent = "Switch to Video Mode";
-          modeToggle.classList.add("active-blue");
-          videoControls.style.display = "none";
-          productSelector.classList.add("visible");
-
-          // Pause BG video logic
+          // Pause BG when entering Webcam Mode
           videoBg.pause();
           isBgPlaying = false;
-
-          // Stop auto-sync heartbeat (so it doesn't override manual selection)
           stopSyncHeartbeat();
-
-          // Force first product
+          // Force first product selection
           setManualProduct(0);
         } else {
-          // Switch BACK to Video Mode
-          modeToggle.textContent = "Switch to Webcam Mode";
-          modeToggle.classList.remove("active-blue");
-          videoControls.style.display = "flex";
-          productSelector.classList.remove("visible");
-
-          // Resume Video Logic
+          // Resume BG if publishing when returning to Video Mode
           if (isPublishing) {
             videoBg.play();
             startSyncHeartbeat();
           }
         }
+        updateUI();
       });
 
       videoBg.addEventListener("play", () => {
