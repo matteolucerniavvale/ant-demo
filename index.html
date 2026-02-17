@@ -337,12 +337,14 @@
           if (videoBg.readyState >= 2) {
             ctx.drawImage(videoBg, 0, 0, canvas.width, canvas.height);
           }
-          const camWidth = 550;
-          const camHeight = 400;
           if (webcam.readyState >= 2) {
             ctx.save();
             ctx.shadowColor = "rgba(0,0,0,0.5)";
             ctx.shadowBlur = 10;
+            // Maintain webcam aspect ratio
+            const aspect = webcam.videoWidth / webcam.videoHeight;
+            const camWidth = 400 * aspect;
+            const camHeight = 400;
             ctx.drawImage(
               webcam,
               canvas.width - camWidth - 10,
