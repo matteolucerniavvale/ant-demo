@@ -16,6 +16,7 @@
         background: #000;
         color: #fff;
       }
+
       #remoteVideo {
         position: absolute;
         top: 0;
@@ -26,6 +27,7 @@
         background: #000;
         z-index: 0;
       }
+
       .overlay {
         position: absolute;
         bottom: 40px;
@@ -42,6 +44,57 @@
       .overlay > * {
         pointer-events: auto;
       }
+
+      /* Play Button Overlay (Salvezza per schermo nero) */
+      .play-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 10;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        cursor: pointer;
+      }
+      .play-btn-circle {
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          transform 0.2s,
+          background 0.2s;
+      }
+      .play-btn-circle:after {
+        content: "";
+        display: block;
+        width: 0;
+        height: 0;
+        border-left: 20px solid #fff;
+        border-top: 12px solid transparent;
+        border-bottom: 12px solid transparent;
+        margin-left: 4px;
+      }
+      .play-overlay:hover .play-btn-circle {
+        transform: scale(1.1);
+        background: rgba(255, 255, 255, 0.4);
+      }
+      .play-text {
+        margin-top: 20px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 1px;
+      }
+
+      /* UI Styles esistenti */
       .wishlist-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
@@ -209,8 +262,14 @@
     </style>
   </head>
   <body>
-    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="remoteVideo" autoplay muted playsinline></video>
+
     <div class="connecting" id="status">Connecting to stream...</div>
+
+    <div class="play-overlay" id="playOverlay">
+      <div class="play-btn-circle"></div>
+      <div class="play-text">Click to Watch Stream</div>
+    </div>
 
     <div class="overlay">
       <div class="wishlist-box" id="wishlistBox">
@@ -247,8 +306,20 @@
 
       const remoteVideo = document.getElementById("remoteVideo");
       const statusEl = document.getElementById("status");
+      const playOverlay = document.getElementById("playOverlay");
       var streamId = "streamCanvas";
       var isRetrying = false;
+
+      // Gestione click manuale sul play overlay
+      playOverlay.addEventListener("click", () => {
+        remoteVideo
+          .play()
+          .then(() => {
+            playOverlay.style.display = "none";
+            remoteVideo.muted = false; // Opzionale: attiva l'audio se serve
+          })
+          .catch((e) => console.error("Play click failed", e));
+      });
 
       var webRTCAdaptor = new WebRTCAdaptor({
         websocket_url: "wss://test.antmedia.io:5443/WebRTCAppEE/websocket",
@@ -256,22 +327,37 @@
         callback: (info, obj) => {
           console.log("Player info:", info, obj);
           if (info === "initialized") webRTCAdaptor.play(streamId);
+
           if (info === "newStreamAvailable") {
             isRetrying = false;
             remoteVideo.srcObject = obj.stream;
             statusEl.style.display = "none";
             document.querySelector(".overlay").style.display = "flex";
+
+            // LOGICA CRITICA PER SCHERMO NERO
+            // Proviamo a fare play(). Se fallisce (Promise Rejected), mostriamo il bottone.
+            const playPromise = remoteVideo.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((error) => {
+                console.warn(
+                  "Autoplay prevented by browser. Showing Play button.",
+                  error,
+                );
+                // Video caricato ma bloccato -> Mostra Overlay
+                playOverlay.style.display = "flex";
+              });
+            }
           }
+
           if (info === "play_finished") {
             statusEl.textContent = "Stream ended";
             statusEl.style.display = "block";
             document.querySelector(".overlay").style.display = "none";
+            playOverlay.style.display = "none"; // Nascondi play btn se stream è finito
           }
           if (info === "data_received") {
             try {
               const data = JSON.parse(obj.data);
-
-              // LOGICA "SLAVE": Il player esegue solo ciò che dice il Master
               if (
                 data.action === "update_product" ||
                 data.action === "force_product" ||
@@ -283,7 +369,6 @@
                   updateProduct();
                 }
               }
-              // Ignoriamo "play" e "pause" per il carosello, servono solo se volessimo mostrare icone di stato
             } catch (e) {
               console.error(e);
             }
@@ -455,7 +540,6 @@
         updateWishlistBtn();
       });
 
-      // Avvio Iniziale
       updateCarousel();
       updateProduct();
     </script>
