@@ -198,16 +198,14 @@
               publishToggle.textContent = "Stop Publishing";
               publishToggle.classList.add("active-red");
 
-              if (isBgPlaying) {
-                sendSyncData("play");
-              } else {
-                sendSyncData("pause");
-              }
+              videoBg.play().catch((e) => console.log(e));
             }
             if (info === "publish_finished") {
               isPublishing = false;
               publishToggle.textContent = "Start Publish";
               publishToggle.classList.remove("active-red");
+
+              videoBg.pause();
             }
           },
           callbackError: (error, message) => {
@@ -215,6 +213,7 @@
             isPublishing = false;
             publishToggle.textContent = "Start Publish";
             publishToggle.classList.remove("active-red");
+            videoBg.pause();
           },
         });
       }
