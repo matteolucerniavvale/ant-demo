@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Canvas Stream - Viewer</title>
     <style>
       * {
@@ -28,6 +31,7 @@
         z-index: 0;
       }
 
+      /* Overlay Desktop Default */
       .overlay {
         position: absolute;
         bottom: 40px;
@@ -45,7 +49,7 @@
         pointer-events: auto;
       }
 
-      /* Play Button Overlay (Salvezza per schermo nero) */
+      /* Play Overlay (Salvezza per schermo nero) */
       .play-overlay {
         position: absolute;
         top: 0;
@@ -94,7 +98,7 @@
         letter-spacing: 1px;
       }
 
-      /* UI Styles esistenti */
+      /* UI Elements Base Styles */
       .wishlist-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
@@ -106,12 +110,26 @@
         max-height: 300px;
         overflow-y: auto;
         flex-shrink: 0;
+        transition: transform 0.3s ease;
+      }
+      .wishlist-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
       }
       .wishlist-box h3 {
         font-size: 14px;
         font-weight: 600;
-        margin-bottom: 8px;
         color: rgba(255, 255, 255, 0.9);
+      }
+      .close-wishlist-btn {
+        display: none;
+        background: none;
+        border: none;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
       }
       .wishlist-empty {
         font-size: 12px;
@@ -152,9 +170,7 @@
         transition: background 0.2s;
         flex-shrink: 0;
       }
-      .wishlist-item-remove:hover {
-        background: rgba(220, 38, 38, 0.9);
-      }
+
       .carousel-box {
         background: rgba(0, 0, 0, 0.55);
         backdrop-filter: blur(10px);
@@ -181,6 +197,7 @@
         opacity: 1;
         border-color: #fff;
       }
+
       .product-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
@@ -241,15 +258,10 @@
       .product-btn.add {
         background: rgba(34, 160, 70, 0.85);
       }
-      .product-btn.add:hover {
-        background: rgba(34, 160, 70, 1);
-      }
       .product-btn.remove {
         background: rgba(220, 38, 38, 0.85);
       }
-      .product-btn.remove:hover {
-        background: rgba(220, 38, 38, 1);
-      }
+
       .connecting {
         position: absolute;
         top: 50%;
@@ -259,32 +271,128 @@
         font-size: 16px;
         color: rgba(255, 255, 255, 0.6);
       }
+
+      /* Mobile Toggle Button (Hidden on Desktop) */
+      .mobile-wishlist-toggle {
+        display: none;
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 20;
+        background: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        font-size: 20px;
+        cursor: pointer;
+        backdrop-filter: blur(5px);
+      }
+      .badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        background: red;
+        color: white;
+        font-size: 10px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+
+      /* --- MOBILE RESPONSIVE CSS --- */
+      @media (max-width: 768px) {
+        .overlay {
+          flex-direction: column; /* Impila elementi verticalmente */
+          justify-content: flex-end;
+          align-items: center;
+          bottom: 20px;
+          gap: 12px;
+        }
+
+        /* Nascondi la wishlist standard su mobile, la mostreremo come modale */
+        .wishlist-box {
+          position: fixed;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          max-height: none;
+          background: rgba(0, 0, 0, 0.95);
+          z-index: 30;
+          border-radius: 0;
+          display: none; /* Inizialmente nascosta */
+          padding: 20px;
+        }
+        .wishlist-box.open {
+          display: block;
+        }
+        .close-wishlist-btn {
+          display: block;
+        } /* Mostra la X per chiudere */
+
+        /* Bottone galleggiante visibile solo su mobile */
+        .mobile-wishlist-toggle {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        /* Carosello più piccolo */
+        .carousel-box {
+          padding: 6px;
+          gap: 6px;
+        }
+        .carousel-box img {
+          width: 90px;
+          height: 60px; /* Rimpiccioliti */
+        }
+
+        /* Product box quasi full width */
+        .product-box {
+          width: 95%;
+          max-width: 400px;
+        }
+      }
     </style>
   </head>
   <body>
     <video id="remoteVideo" autoplay muted playsinline></video>
-
     <div class="connecting" id="status">Connecting to stream...</div>
-
     <div class="play-overlay" id="playOverlay">
       <div class="play-btn-circle"></div>
-      <div class="play-text">Click to Watch Stream</div>
+      <div class="play-text">Click to Start Stream</div>
     </div>
+
+    <button class="mobile-wishlist-toggle" id="mobileWishlistToggle">
+      ♥
+      <div class="badge" id="wishlistBadge">0</div>
+    </button>
 
     <div class="overlay">
       <div class="wishlist-box" id="wishlistBox">
-        <h3>Wishlist</h3>
+        <div class="wishlist-header">
+          <h3>Your Wishlist</h3>
+          <button class="close-wishlist-btn" id="closeWishlist">✕</button>
+        </div>
         <div id="wishlistItems">
-          <span class="wishlist-empty"
-            >Your wishlist is empty.<br />Add items from the product card.</span
-          >
+          <span class="wishlist-empty">Your wishlist is empty.</span>
         </div>
       </div>
+
       <div class="carousel-box" id="carouselBox">
         <img id="carouselLeft" src="" alt="carousel" />
         <img id="carouselCenter" class="active" src="" alt="carousel" />
         <img id="carouselRight" src="" alt="carousel" />
       </div>
+
       <div class="product-box" id="productBox">
         <div class="product-top">
           <img class="product-thumb" id="productThumb" src="" alt="product" />
@@ -310,15 +418,30 @@
       var streamId = "streamCanvas";
       var isRetrying = false;
 
-      // Gestione click manuale sul play overlay
+      // Mobile UI Elements
+      const mobileWishlistToggle = document.getElementById(
+        "mobileWishlistToggle",
+      );
+      const wishlistBox = document.getElementById("wishlistBox");
+      const closeWishlist = document.getElementById("closeWishlist");
+      const wishlistBadge = document.getElementById("wishlistBadge");
+
+      // Mobile: Toggle Wishlist
+      mobileWishlistToggle.addEventListener("click", () => {
+        wishlistBox.classList.add("open");
+      });
+      closeWishlist.addEventListener("click", () => {
+        wishlistBox.classList.remove("open");
+      });
+
       playOverlay.addEventListener("click", () => {
         remoteVideo
           .play()
           .then(() => {
             playOverlay.style.display = "none";
-            remoteVideo.muted = false; // Opzionale: attiva l'audio se serve
+            remoteVideo.muted = false;
           })
-          .catch((e) => console.error("Play click failed", e));
+          .catch((e) => console.error(e));
       });
 
       var webRTCAdaptor = new WebRTCAdaptor({
@@ -327,33 +450,23 @@
         callback: (info, obj) => {
           console.log("Player info:", info, obj);
           if (info === "initialized") webRTCAdaptor.play(streamId);
-
           if (info === "newStreamAvailable") {
             isRetrying = false;
             remoteVideo.srcObject = obj.stream;
             statusEl.style.display = "none";
             document.querySelector(".overlay").style.display = "flex";
-
-            // LOGICA CRITICA PER SCHERMO NERO
-            // Proviamo a fare play(). Se fallisce (Promise Rejected), mostriamo il bottone.
             const playPromise = remoteVideo.play();
             if (playPromise !== undefined) {
-              playPromise.catch((error) => {
-                console.warn(
-                  "Autoplay prevented by browser. Showing Play button.",
-                  error,
-                );
-                // Video caricato ma bloccato -> Mostra Overlay
+              playPromise.catch(() => {
                 playOverlay.style.display = "flex";
               });
             }
           }
-
           if (info === "play_finished") {
             statusEl.textContent = "Stream ended";
             statusEl.style.display = "block";
             document.querySelector(".overlay").style.display = "none";
-            playOverlay.style.display = "none"; // Nascondi play btn se stream è finito
+            playOverlay.style.display = "none";
           }
           if (info === "data_received") {
             try {
@@ -369,9 +482,7 @@
                   updateProduct();
                 }
               }
-            } catch (e) {
-              console.error(e);
-            }
+            } catch (e) {}
           }
         },
         callbackError: (error, message) => {
@@ -500,9 +611,15 @@
       function renderWishlist() {
         if (wishlist.length === 0) {
           wishlistItemsEl.innerHTML =
-            '<span class="wishlist-empty">Your wishlist is empty.<br/>Add items from the product card.</span>';
+            '<span class="wishlist-empty">Your wishlist is empty.</span>';
+          wishlistBadge.style.display = "none";
           return;
         }
+
+        // Update Badge
+        wishlistBadge.textContent = wishlist.length;
+        wishlistBadge.style.display = "flex";
+
         var html = "";
         wishlist.forEach((idx) => {
           var p = products[idx];
