@@ -88,6 +88,51 @@
         color: #aecbfa;
         text-decoration: underline;
       }
+      .wishlist-recap {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1;
+        width: 260px;
+        max-height: 400px;
+        background: rgba(15, 15, 15, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 14px;
+        overflow-y: auto;
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .wishlist-recap h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 8px;
+      }
+      .wishlist-log {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .log-item {
+        font-size: 12px;
+        padding: 6px 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+        border-left: 3px solid #22a046;
+      }
+      .log-item span {
+        display: block;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 10px;
+        margin-top: 2px;
+      }
     </style>
   </head>
   <body>
@@ -105,6 +150,15 @@
       <a href="./player.html" target="_blank">Open Player</a>
     </div>
 
+    <div class="wishlist-recap">
+      <h3>Live Wishlist Activity</h3>
+      <div class="wishlist-log" id="wishlistLog">
+        <div style="font-size: 12px; color: #666; font-style: italic">
+          No items added yet...
+        </div>
+      </div>
+    </div>
+
     <script type="module">
       import { WebRTCAdaptor } from "https://cdn.skypack.dev/@antmedia/webrtc_adaptor@SNAPSHOT";
 
@@ -114,6 +168,7 @@
       const ctx = canvas.getContext("2d");
       const publishToggle = document.getElementById("publishToggle");
       const bgToggle = document.getElementById("bgToggle");
+      const wishlistLog = document.getElementById("wishlistLog");
 
       var streamId = "streamCanvas";
       var webRTCAdaptor;
@@ -121,7 +176,13 @@
       var isBgPlaying = false;
       var syncInterval = null;
 
-      const BOTTOM_MARGIN = 50;
+      const products = [
+        { name: "Aviator Classic", brand: "Ray-Ban" },
+        { name: "Wayfarer Original", brand: "Ray-Ban" },
+        { name: "Clubmaster Metal", brand: "Ray-Ban" },
+        { name: "Round Double Bridge", brand: "Ray-Ban" },
+        { name: "Hexagonal Flat", brand: "Ray-Ban" },
+      ];
 
       function resizeCanvas() {
         const targetW = videoBg.videoWidth || window.innerWidth;
@@ -186,6 +247,33 @@
         if (!webRTCAdaptor) initWebRTC();
       });
 
+      function addLogItem(productIndex) {
+        if (
+          wishlistLog.children.length > 0 &&
+          wishlistLog.children[0].style.fontStyle === "italic"
+        ) {
+          wishlistLog.innerHTML = "";
+        }
+
+        const product = products[productIndex];
+        if (!product) return;
+
+        const div = document.createElement("div");
+        div.className = "log-item";
+
+        const now = new Date();
+        const timeString =
+          now.getHours() +
+          ":" +
+          String(now.getMinutes()).padStart(2, "0") +
+          ":" +
+          String(now.getSeconds()).padStart(2, "0");
+
+        div.innerHTML = `<strong>${product.name}</strong> added to a wishlist<span>${timeString}</span>`;
+
+        wishlistLog.prepend(div);
+      }
+
       function initWebRTC() {
         var localCanvasStream = canvas.captureStream(25);
 
@@ -212,6 +300,16 @@
 
               stopSyncHeartbeat();
               videoBg.pause();
+            }
+            if (info === "data_received") {
+              try {
+                const data = JSON.parse(obj.data);
+                if (data.action === "wishlist_add") {
+                  addLogItem(data.index);
+                }
+              } catch (e) {
+                console.error(e);
+              }
             }
           },
           callbackError: (error, message) => {

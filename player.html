@@ -452,6 +452,18 @@
           if (pos !== -1) wishlist.splice(pos, 1);
         } else {
           wishlist.push(carouselIndex);
+          // Send data to presenter
+          try {
+            if (webRTCAdaptor) {
+              const payload = JSON.stringify({
+                action: "wishlist_add",
+                index: carouselIndex,
+              });
+              webRTCAdaptor.sendData(streamId, payload);
+            }
+          } catch (e) {
+            console.error(e);
+          }
         }
         renderWishlist();
         updateWishlistBtn();
@@ -465,7 +477,7 @@
 
       function startCarousel() {
         if (carouselInterval) return;
-        carouselInterval = setInterval(advanceCarousel, 3000);
+        carouselInterval = setInterval(advanceCarousel, 7000);
       }
 
       function stopCarousel() {
