@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canvas Stream - Viewer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        overflow: hidden;
+        font-family: sans-serif;
+        background: #000;
+        color: #fff;
+      }
+      #remoteVideo {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+        z-index: 0;
+      }
+      .overlay {
+        position: absolute;
+        bottom: 40px;
+        left: 0;
+        right: 0;
+        z-index: 1;
+        display: none;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 14px;
+        padding: 0 14px;
+        pointer-events: none;
+      }
+      .overlay > * {
+        pointer-events: auto;
+      }
+
+      .wishlist-box {
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 12px;
+        width: 220px;
+        min-height: 116px;
+        max-height: 300px;
+        overflow-y: auto;
+        flex-shrink: 0;
+      }
+      .wishlist-box h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .wishlist-empty {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.35);
+        line-height: 1.5;
+      }
+      .wishlist-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .wishlist-item:last-child {
+        border-bottom: none;
+      }
+      .wishlist-item-info {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .wishlist-item-name {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .wishlist-item-price {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .wishlist-item-remove {
+        background: rgba(220, 38, 38, 0.6);
+        border: none;
+        color: #fff;
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .wishlist-item-remove:hover {
+        background: rgba(220, 38, 38, 0.9);
+      }
+
+      .carousel-box {
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 10px;
+        padding: 8px 10px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .carousel-box img {
+        display: block;
+        width: 160px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 6px;
+        opacity: 0.5;
+        border: 2px solid transparent;
+        transition:
+          opacity 0.4s,
+          border-color 0.4s;
+      }
+      .carousel-box img.active {
+        opacity: 1;
+        border-color: #fff;
+      }
+
+      .product-box {
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 12px;
+        width: 280px;
+        flex-shrink: 0;
+      }
+      .product-top {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .product-thumb {
+        width: 90px;
+        height: 70px;
+        object-fit: cover;
+        border-radius: 6px;
+        flex-shrink: 0;
+      }
+      .product-info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+      }
+      .product-name {
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .product-brand {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .product-price {
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .product-details {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-bottom: 10px;
+        line-height: 1.5;
+      }
+      .product-btn {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.2s;
+        color: #fff;
+      }
+      .product-btn.add {
+        background: rgba(34, 160, 70, 0.85);
+      }
+      .product-btn.add:hover {
+        background: rgba(34, 160, 70, 1);
+      }
+      .product-btn.remove {
+        background: rgba(220, 38, 38, 0.85);
+      }
+      .product-btn.remove:hover {
+        background: rgba(220, 38, 38, 1);
+      }
+
+      .connecting {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+        font-size: 16px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <video id="remoteVideo" autoplay playsinline></video>
+    <div class="connecting" id="status">Connecting to stream...</div>
+
+    <div class="overlay">
+      <div class="wishlist-box" id="wishlistBox">
+        <h3>Wishlist</h3>
+        <div id="wishlistItems">
+          <span class="wishlist-empty"
+            >Your wishlist is empty.<br />Add items from the product card.</span
+          >
+        </div>
+      </div>
+
+      <div class="carousel-box" id="carouselBox">
+        <img id="carouselLeft" src="" alt="carousel" />
+        <img id="carouselCenter" class="active" src="" alt="carousel" />
+        <img id="carouselRight" src="" alt="carousel" />
+      </div>
+
+      <div class="product-box" id="productBox">
+        <div class="product-top">
+          <img class="product-thumb" id="productThumb" src="" alt="product" />
+          <div class="product-info">
+            <span class="product-name" id="productName"></span>
+            <span class="product-brand" id="productBrand"></span>
+            <span class="product-price" id="productPrice"></span>
+          </div>
+        </div>
+        <div class="product-details" id="productDetails"></div>
+        <button class="product-btn add" id="wishlistBtn">
+          Add to Wishlist
+        </button>
+      </div>
+    </div>
+
+    <script type="module">
+      import { WebRTCAdaptor } from "https://cdn.skypack.dev/@antmedia/webrtc_adaptor@SNAPSHOT";
+
+      const remoteVideo = document.getElementById("remoteVideo");
+      const statusEl = document.getElementById("status");
+      var streamId = "streamCanvas";
+      var isRetrying = false;
+
+      var webRTCAdaptor = new WebRTCAdaptor({
+        websocket_url: "wss://test.antmedia.io:5443/WebRTCAppEE/websocket",
+        mediaConstraints: { video: false, audio: false },
+        callback: (info, obj) => {
+          console.log("Player info:", info, obj);
+          if (info === "initialized") {
+            webRTCAdaptor.play(streamId);
+          }
+          if (info === "newStreamAvailable") {
+            isRetrying = false;
+            remoteVideo.srcObject = obj.stream;
+            statusEl.style.display = "none";
+            document.querySelector(".overlay").style.display = "flex";
+          }
+          if (info === "play_finished") {
+            statusEl.textContent = "Stream ended";
+            statusEl.style.display = "block";
+            document.querySelector(".overlay").style.display = "none";
+            stopCarousel();
+          }
+          if (info === "data_received") {
+            try {
+              const data = JSON.parse(obj.data);
+              if (data.action === "play") {
+                startCarousel();
+              } else if (data.action === "pause") {
+                stopCarousel();
+              }
+            } catch (e) {
+              console.error(e);
+            }
+          }
+        },
+        callbackError: (error, message) => {
+          console.error("Player error:", error, message);
+          if (error === "no_stream_exist") {
+            statusEl.textContent = "Stream not available. Retrying...";
+            if (!isRetrying) {
+              isRetrying = true;
+              setTimeout(() => {
+                isRetrying = false;
+                webRTCAdaptor.play(streamId);
+              }, 3000);
+            }
+          }
+        },
+      });
+
+      const products = [
+        {
+          name: "Aviator Classic",
+          brand: "Ray-Ban",
+          price: "159.00",
+          color: "Gold / Green",
+          lens: "Polarized G-15",
+        },
+        {
+          name: "Wayfarer Original",
+          brand: "Ray-Ban",
+          price: "139.00",
+          color: "Black / Crystal",
+          lens: "Standard Green",
+        },
+        {
+          name: "Clubmaster Metal",
+          brand: "Ray-Ban",
+          price: "179.00",
+          color: "Silver / Blue",
+          lens: "Gradient Blue",
+        },
+        {
+          name: "Round Double Bridge",
+          brand: "Ray-Ban",
+          price: "189.00",
+          color: "Bronze / Pink",
+          lens: "Mirror Pink",
+        },
+        {
+          name: "Hexagonal Flat",
+          brand: "Ray-Ban",
+          price: "169.00",
+          color: "Gunmetal / Grey",
+          lens: "Polarized Grey",
+        },
+      ];
+
+      const carouselSources = [
+        "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1577803645773-f96470509666?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1509695507497-903c140c43b0?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=200&h=120&fit=crop",
+      ];
+
+      const imgLeft = document.getElementById("carouselLeft");
+      const imgCenter = document.getElementById("carouselCenter");
+      const imgRight = document.getElementById("carouselRight");
+      const productThumb = document.getElementById("productThumb");
+      const productName = document.getElementById("productName");
+      const productBrand = document.getElementById("productBrand");
+      const productPrice = document.getElementById("productPrice");
+      const productDetails = document.getElementById("productDetails");
+      const wishlistBtn = document.getElementById("wishlistBtn");
+      const wishlistItemsEl = document.getElementById("wishlistItems");
+
+      let carouselIndex = 0;
+      let wishlist = [];
+      let carouselInterval = null;
+
+      function getIndex(offset) {
+        return (
+          (carouselIndex + offset + carouselSources.length) %
+          carouselSources.length
+        );
+      }
+
+      function updateCarousel() {
+        imgLeft.src = carouselSources[getIndex(-1)];
+        imgCenter.src = carouselSources[getIndex(0)];
+        imgRight.src = carouselSources[getIndex(1)];
+      }
+
+      function updateProduct() {
+        var p = products[carouselIndex];
+        productThumb.src = carouselSources[carouselIndex];
+        productName.textContent = p.name;
+        productBrand.textContent = p.brand;
+        productPrice.textContent = "€ " + p.price;
+        productDetails.textContent =
+          "Color: " + p.color + "  |  Lens: " + p.lens;
+        updateWishlistBtn();
+      }
+
+      function isInWishlist(index) {
+        return wishlist.indexOf(index) !== -1;
+      }
+
+      function updateWishlistBtn() {
+        if (isInWishlist(carouselIndex)) {
+          wishlistBtn.textContent = "Remove from Wishlist";
+          wishlistBtn.className = "product-btn remove";
+        } else {
+          wishlistBtn.textContent = "Add to Wishlist";
+          wishlistBtn.className = "product-btn add";
+        }
+      }
+
+      function renderWishlist() {
+        if (wishlist.length === 0) {
+          wishlistItemsEl.innerHTML =
+            '<span class="wishlist-empty">Your wishlist is empty.<br/>Add items from the product card.</span>';
+          return;
+        }
+        var html = "";
+        wishlist.forEach((idx) => {
+          var p = products[idx];
+          html +=
+            '<div class="wishlist-item">' +
+            '<div class="wishlist-item-info">' +
+            '<span class="wishlist-item-name">' +
+            p.name +
+            "</span>" +
+            '<span class="wishlist-item-price">' +
+            p.brand +
+            " — € " +
+            p.price +
+            "</span>" +
+            "</div>" +
+            '<button class="wishlist-item-remove" data-index="' +
+            idx +
+            '">Remove</button>' +
+            "</div>";
+        });
+        wishlistItemsEl.innerHTML = html;
+        wishlistItemsEl
+          .querySelectorAll(".wishlist-item-remove")
+          .forEach((btn) => {
+            btn.addEventListener("click", () => {
+              var i = parseInt(btn.getAttribute("data-index"));
+              var pos = wishlist.indexOf(i);
+              if (pos !== -1) wishlist.splice(pos, 1);
+              renderWishlist();
+              updateWishlistBtn();
+            });
+          });
+      }
+
+      wishlistBtn.addEventListener("click", () => {
+        if (isInWishlist(carouselIndex)) {
+          var pos = wishlist.indexOf(carouselIndex);
+          if (pos !== -1) wishlist.splice(pos, 1);
+        } else {
+          wishlist.push(carouselIndex);
+        }
+        renderWishlist();
+        updateWishlistBtn();
+      });
+
+      function advanceCarousel() {
+        carouselIndex = (carouselIndex + 1) % carouselSources.length;
+        updateCarousel();
+        updateProduct();
+      }
+
+      function startCarousel() {
+        if (carouselInterval) return;
+        carouselInterval = setInterval(advanceCarousel, 3000);
+      }
+
+      function stopCarousel() {
+        if (carouselInterval) {
+          clearInterval(carouselInterval);
+          carouselInterval = null;
+        }
+      }
+
+      updateCarousel();
+      updateProduct();
+    </script>
+  </body>
+</html>
