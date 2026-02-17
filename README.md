@@ -2,13 +2,14 @@
 
 ## 1. Panoramica dell'Architettura
 
-La soluzione realizza un sistema di streaming **One-to-Many** a bassissima latenza (Low Latency WebRTC) per applicazioni di Live Commerce. L'architettura è **Client-Side Composition**: il mixaggio delle sorgenti video e grafiche avviene nel browser del presentatore, riducendo il carico server e permettendo interattività complessa senza post-produzione lato backend.
+La soluzione realizza un sistema di streaming **One-to-Many** a bassissima latenza (Low Latency WebRTC) per applicazioni di Live Commerce.
+L'architettura adotta un pattern **Master-Slave (Source of Truth)**: il Presenter (Master) detiene lo stato dell'applicazione e il timer del carosello, mentre i Viewer (Slaves) si limitano a replicare lo stato ricevuto, garantendo una sincronizzazione perfetta indipendentemente dalla latenza di rete o dal momento di connessione.
 
 ### Flusso Dati
 
-1. **Presenter (Broadcaster):** Genera il feed audio/video composito e invia comandi di sincronizzazione.
+1. **Presenter (Master):** Gestisce il loop temporale (7s), il mixaggio video (Canvas) e invia comandi di stato (Indice prodotto, Play/Pause).
 2. **Ant Media Server (AMS):** Agisce come relay WebRTC (SFU) per la distribuzione dello stream e il routing dei messaggi Data Channel.
-3. **Viewer (Player):** Riceve lo stream video e i metadati JSON per aggiornare l'interfaccia locale in tempo reale.
+3. **Viewer (Slave):** Riceve lo stream video e i comandi JSON. Non calcola il tempo localmente, ma aggiorna la UI (Carosello, Product Card) solo su istruzione del Master.
 
 ---
 
@@ -16,79 +17,77 @@ La soluzione realizza un sistema di streaming **One-to-Many** a bassissima laten
 
 - **Core Server:** Ant Media Server Enterprise Edition (WebRTCAppEE).
 - **Protocollo:** WebRTC (Video/Audio) + SCTP (Data Channels).
-- **Frontend:** HTML5 Canvas API, JavaScript (ES6 Modules).
+- **Frontend:** HTML5 Canvas API, JavaScript (ES6 Modules), CSS3 Media Queries.
 - **Libreria Client:** `@antmedia/webrtc_adaptor` (versione Snapshot).
 
 ---
 
 ## 3. Implementazione Presenter (`index.html`)
 
-Il Presenter funge da mixer video e controller della logica di business.
+Il Presenter funge da mixer video e "Timekeeper" dell'applicazione.
 
 ### 3.1. Composizione Video (Canvas Mixing)
 
-Il cuore del sistema è un loop di rendering (`requestAnimationFrame`) che disegna su un elemento `<canvas>` HTML5.
+Il rendering avviene su un elemento `<canvas>` tramite `requestAnimationFrame`.
 
-- **Sorgenti:**
-- `videoBg`: Video promozionale (file locale o remoto con CORS abilitato).
-- `webcam`: Stream `getUserMedia` locale.
-
+- **Sorgenti:** `videoBg` (Video promozionale) e `webcam` (User Media).
 - **Modalità di Streaming:**
+- **Video Mode:** Background video attivo + Webcam in Picture-in-Picture. Il carosello avanza automaticamente.
+- **Webcam Mode:** Webcam a tutto schermo (simulazione `object-fit: cover`). Il carosello è manuale e controllato dal presentatore.
 
-1. **Video Mode:** Background video a tutto schermo + Webcam in Picture-in-Picture (top-right).
-2. **Webcam Mode:** Webcam a tutto schermo con logica `object-fit: cover` calcolata matematicamente per preservare l'aspect ratio.
+### 3.2. Master Timer & Badge "On Air"
 
-### 3.2. Generazione dello Stream
+In _Video Mode_, il presentatore esegue un `setInterval` (7000ms). Ad ogni tick:
 
-Lo stream inviato ad AMS non proviene direttamente dalla webcam, ma dalla Canvas:
+1. Aggiorna l'indice locale e il badge visivo **"ON AIR"** (visibile solo al presentatore).
+2. Invia il comando `update_product` a tutti gli spettatori via Data Channel.
 
-```javascript
-var localCanvasStream = canvas.captureStream(25); // 25 FPS
-```
+### 3.3. Heartbeat di Sincronizzazione
 
-Questo permette di trasmettere esattamente ciò che viene renderizzato, inclusi cambi di layout istantanei.
+Per allineare gli utenti che si connettono in ritardo (Late Joiners):
 
-### 3.3. Logica di Sincronizzazione (Heartbeat)
-
-Per garantire che tutti gli spettatori (anche quelli che si connettono in ritardo) siano sincronizzati con lo stato del presentatore, è implementato un pattern **Heartbeat**:
-
-- Un intervallo (`setInterval` 2000ms) invia costantemente lo stato corrente (`play` o `pause`) tramite Data Channel quando si è in Video Mode.
-- In Webcam Mode, l'heartbeat viene sospeso per dare priorità ai comandi manuali (`force_product`).
+- Un intervallo separato (2000ms) invia il comando `sync_status` contenente l'**indice corrente** del prodotto e lo stato (play/pause).
 
 ---
 
 ## 4. Implementazione Viewer (`player.html`)
 
-Il Viewer è un client passivo che reagisce agli stream e ai dati.
+Il Viewer è un client passivo ottimizzato per la compatibilità e la responsività.
 
-### 4.1. UI Overlay
+### 4.1. Gestione Autoplay & Recovery
 
-L'interfaccia (Carosello prodotti, Wishlist, Product Card) **non** è impressa nel video (non è "burned-in"). È realizzata in HTML/CSS sovrapposto al tag `<video>`. Questo garantisce:
+Per aggirare le policy di Autoplay dei browser moderni:
 
-- Nitidezza del testo indipendente dalla qualità del video.
-- Interattività locale (click sui bottoni).
-- Riduzione della banda video necessaria.
+- Il video parte sempre `muted`.
+- Se la Promise `play()` fallisce (schermo nero), viene mostrato automaticamente un overlay interattivo **"Click to Start Stream"**.
 
-### 4.2. Gestione Data Channel
+### 4.2. UI Responsive (Mobile First)
 
-Il player ascolta l'evento `data_received` dell'SDK Ant Media. I messaggi JSON in ingresso triggerano la logica locale:
+L'interfaccia HTML sovrapposta si adatta al dispositivo tramite CSS Media Queries (`max-width: 768px`):
 
-- Ricezione `play`/`pause`: Avvia/Ferma il carosello automatico locale.
-- Ricezione `force_product`: Forza la visualizzazione di un prodotto specifico e ferma il carosello.
+- **Desktop:** Layout orizzontale in basso.
+- **Mobile:** Layout a "pila" verticale (Wishlist in alto, Carosello al centro, Scheda Prodotto in basso), sempre visibili e ottimizzati per il tocco.
+
+### 4.3. Logica Slave
+
+Il viewer non possiede logica temporale (`setInterval`). Ascolta i messaggi `data_received`:
+
+- `update_product` / `force_product` / `sync_status`: Al ricevimento, aggiorna immediatamente l'indice del carosello e renderizza il prodotto corrispondente.
 
 ---
 
 ## 5. Protocollo di Comunicazione (Data Channel)
 
-La comunicazione avviene tramite payload JSON bidirezionali su canale SCTP.
+La comunicazione avviene tramite payload JSON bidirezionali.
 
-### Presenter → Viewer (Comandi)
+### Presenter → Viewer (Comandi Master)
 
-| Action    | Payload                                     | Descrizione                            | Trigger                       |
-| --------- | ------------------------------------------- | -------------------------------------- | ----------------------------- |
-| **Play**  | `{ "action": "play" }`                      | Avvia rotazione carosello lato client. | VideoBg Play o Heartbeat.     |
-| **Pause** | `{ "action": "pause" }`                     | Ferma rotazione carosello lato client. | VideoBg Pause o Heartbeat.    |
-| **Force** | `{ "action": "force_product", "index": N }` | Mostra prodotto N e stoppa rotazione.  | Click manuale in Webcam Mode. |
+| Action         | Payload                                      | Descrizione                                | Trigger                                 |
+| -------------- | -------------------------------------------- | ------------------------------------------ | --------------------------------------- |
+| **Update**     | `{ "action": "update_product", "index": N }` | Avanzamento automatico del carosello.      | Timer (7s) del Presenter in Video Mode. |
+| **Force**      | `{ "action": "force_product", "index": N }`  | Cambio prodotto manuale immediato.         | Click su Product Bar in Webcam Mode.    |
+| **Sync**       | `{ "action": "sync_status", "index": N }`    | Allineamento stato per nuovi utenti.       | Heartbeat (2s) del Presenter.           |
+| **Play/Pause** | `{ "action": "play" }` (o pause)             | Segnale di stato video (opzionale per UI). | Toggle manuale del Presenter.           |
 
 ### Viewer → Presenter (Feedback)
 
@@ -99,24 +98,21 @@ La comunicazione avviene tramite payload JSON bidirezionali su canale SCTP.
 
 ---
 
-## 6. Configurazione Ant Media Server
+## 6. Configurazione e Deployment
 
-La connessione è stabilita via WebSocket Secure (WSS).
+- **Ant Media Server:** Endpoint WSS standard (`wss://.../WebRTCAppEE/websocket`).
+- **CORS (Cross-Origin Resource Sharing):**
+- Il video di background (`videoBg`) viene caricato da file locale per evitare il "Tainting" della Canvas.
+- Se si usa un video remoto, il server ospitante _deve_ esporre l'header `Access-Control-Allow-Origin: *` e il tag video deve avere `crossorigin="anonymous"`.
 
-- **Endpoint:** `wss://[AMS-DOMAIN]:5443/WebRTCAppEE/websocket`
-- **Media Constraints Viewer:** `{ video: false, audio: false }` (Poiché il viewer riceve solo, non invia media).
-- **Error Handling:**
-- `no_stream_exist`: Implementata logica di **Auto-Retry** (polling ogni 3 secondi) lato Viewer per gestire riconnessioni o avvio ritardato dello stream.
+- **HTTPS:** Obbligatorio per l'accesso ai dispositivi (Webcam) e per la stabilità del Data Channel su reti pubbliche.
 
-## 7. Note di Deployment
-
-- **Requisiti CORS:** Le risorse video esterne caricate nella Canvas (`drawImage`) devono avere l'header `Access-Control-Allow-Origin: *` e attributo `crossorigin="anonymous"`, altrimenti la Canvas diventa "tainted" e il browser blocca lo streaming.
-- **HTTPS:** Obbligatorio per l'accesso a `getUserMedia` (Webcam/Microfono) sui browser moderni.
+### Struttura Progetto
 
 ```
-ant-demo
-├─ background.mp4
-├─ index.html
-└─ player.html
+ant-demo/
+├─ background.mp4      # Video locale (Scaricato per evitare CORS)
+├─ index.html          # Presenter (Master Logic)
+└─ player.html         # Viewer (Slave Logic + Mobile UI)
 
 ```
