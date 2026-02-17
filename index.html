@@ -25,11 +25,12 @@
         transform: translate(-50%, -50%);
         z-index: 0;
       }
+      /* CONTROLS (Top Left) */
       .controls {
         position: absolute;
         top: 10px;
         left: 10px;
-        z-index: 1;
+        z-index: 2;
         background: rgba(15, 15, 15, 0.75);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -52,52 +53,42 @@
         border-radius: 8px;
         font-size: 13px;
         cursor: pointer;
-        transition:
-          background 0.2s,
-          border-color 0.2s;
+        transition: all 0.2s;
       }
       .controls button:hover {
         background: rgba(255, 255, 255, 0.2);
-        border-color: rgba(255, 255, 255, 0.3);
       }
-      .controls button:active {
-        background: rgba(255, 255, 255, 0.28);
-      }
+      /* Active States */
       .controls button.active-red {
         background: rgba(220, 38, 38, 0.8);
         border-color: rgba(220, 38, 38, 0.9);
-      }
-      .controls button.active-red:hover {
-        background: rgba(220, 38, 38, 0.95);
       }
       .controls button.active-green {
         background: rgba(34, 160, 70, 0.8);
         border-color: rgba(34, 160, 70, 0.9);
       }
-      .controls button.active-green:hover {
-        background: rgba(34, 160, 70, 0.95);
+      .controls button.active-blue {
+        background: #3b82f6;
+        border-color: #60a5fa;
       }
       .controls a {
         display: inline-block;
         color: #8ab4f8;
         font-size: 13px;
         text-decoration: none;
-        transition: color 0.2s;
+        margin-top: 4px;
       }
-      .controls a:hover {
-        color: #aecbfa;
-        text-decoration: underline;
-      }
+
+      /* WISHLIST RECAP (Bottom Left) */
       .wishlist-recap {
         position: absolute;
         bottom: 20px;
         left: 20px;
-        z-index: 1;
+        z-index: 2;
         width: 260px;
         max-height: 300px;
         background: rgba(15, 15, 15, 0.85);
         backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 12px;
         padding: 14px;
@@ -133,6 +124,44 @@
         font-size: 10px;
         margin-top: 2px;
       }
+
+      /* MANUAL PRODUCT SELECTOR (Bottom Center) - Hidden by default */
+      .product-selector {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 10px;
+        display: none; /* Hidden unless in Webcam Mode */
+        gap: 8px;
+      }
+      .product-selector.visible {
+        display: flex;
+      }
+      .prod-btn {
+        background: #333;
+        border: 1px solid #555;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        max-width: 100px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .prod-btn:hover {
+        background: #555;
+      }
+      .prod-btn.active {
+        background: #22a046;
+        border-color: #4ade80;
+      }
     </style>
   </head>
   <body>
@@ -142,6 +171,9 @@
 
     <div class="controls">
       <div class="btn-row">
+        <button id="modeToggle">Switch to Webcam Mode</button>
+      </div>
+      <div class="btn-row" id="videoControls">
         <button id="bgToggle" class="active-green">Play Background</button>
       </div>
       <div class="btn-row">
@@ -149,6 +181,8 @@
       </div>
       <a href="./player.html" target="_blank">Open Player</a>
     </div>
+
+    <div class="product-selector" id="productSelector"></div>
 
     <div class="wishlist-recap">
       <h3>Live Wishlist Activity</h3>
@@ -169,8 +203,13 @@
       const webcam = document.getElementById("webcam");
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
+
       const publishToggle = document.getElementById("publishToggle");
       const bgToggle = document.getElementById("bgToggle");
+      const modeToggle = document.getElementById("modeToggle");
+      const videoControls = document.getElementById("videoControls");
+      const productSelector = document.getElementById("productSelector");
+
       const wishlistLog = document.getElementById("wishlistLog");
       const emptyMsg = document.getElementById("emptyMsg");
 
@@ -178,7 +217,9 @@
       var webRTCAdaptor;
       var isPublishing = false;
       var isBgPlaying = false;
+      var isWebcamMode = false; // NEW STATE
       var syncInterval = null;
+      var currentManualIndex = 0;
 
       const products = [
         { name: "Aviator Classic", brand: "Ray-Ban" },
@@ -188,17 +229,35 @@
         { name: "Hexagonal Flat", brand: "Ray-Ban" },
       ];
 
+      // --- SETUP PRODUCT BUTTONS ---
+      products.forEach((p, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "prod-btn";
+        btn.textContent = p.name;
+        btn.onclick = () => setManualProduct(idx);
+        productSelector.appendChild(btn);
+      });
+
+      function setManualProduct(index) {
+        currentManualIndex = index;
+        // Update visual active state
+        const buttons = productSelector.querySelectorAll(".prod-btn");
+        buttons.forEach((b, i) => {
+          if (i === index) b.classList.add("active");
+          else b.classList.remove("active");
+        });
+        // Send Data
+        sendSyncData("force_product", index);
+      }
+
       function resizeCanvas() {
         const targetW = videoBg.videoWidth || window.innerWidth;
         const targetH = videoBg.videoHeight || window.innerHeight;
-
         if (targetW && targetH) {
           canvas.width = targetW;
           canvas.height = targetH;
         }
-
-        if (!canvas.width || !canvas.height) return;
-
+        // ... (resize CSS logic remains same)
         var ratio = canvas.width / canvas.height;
         var winW = window.innerWidth;
         var winH = window.innerHeight;
@@ -211,36 +270,64 @@
           canvas.style.height = Math.round(winW / ratio) + "px";
         }
       }
-
       window.addEventListener("resize", resizeCanvas);
 
       navigator.mediaDevices
-        .getUserMedia({
-          video: { width: 640, height: 480 },
-        })
+        .getUserMedia({ video: { width: 1280, height: 720 } }) // Requested higher res for fullscreen
         .then((stream) => {
           webcam.srcObject = stream;
         })
         .catch((err) => console.error(err));
 
+      // Helper to simulate object-fit: cover on Canvas
+      function drawWebcamCover() {
+        if (webcam.readyState < 2) return;
+
+        const cw = canvas.width;
+        const ch = canvas.height;
+        const vw = webcam.videoWidth;
+        const vh = webcam.videoHeight;
+
+        const r = Math.min(cw / vw, ch / vh);
+        const nw = vw * r; // new width (contain)
+        const nh = vh * r; // new height (contain)
+
+        // Logic for COVER
+        let scale = Math.max(cw / vw, ch / vh);
+        let x = cw / 2 - (vw / 2) * scale;
+        let y = ch / 2 - (vh / 2) * scale;
+
+        ctx.drawImage(webcam, x, y, vw * scale, vh * scale);
+      }
+
       function draw() {
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (videoBg.readyState >= 2) {
-          ctx.drawImage(videoBg, 0, 0, canvas.width, canvas.height);
-        }
-
-        const camWidth = 550;
-        const camHeight = 400;
-        if (webcam.readyState >= 2) {
-          ctx.drawImage(
-            webcam,
-            canvas.width - camWidth - 10,
-            10,
-            camWidth,
-            camHeight,
-          );
+        if (isWebcamMode) {
+          // --- WEBCAM MODE: Full Screen Webcam Only ---
+          drawWebcamCover();
+        } else {
+          // --- VIDEO MODE: Background + Small Webcam ---
+          if (videoBg.readyState >= 2) {
+            ctx.drawImage(videoBg, 0, 0, canvas.width, canvas.height);
+          }
+          // Small webcam top right
+          const camWidth = 550;
+          const camHeight = 400;
+          if (webcam.readyState >= 2) {
+            ctx.save();
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 10;
+            ctx.drawImage(
+              webcam,
+              canvas.width - camWidth - 10,
+              10,
+              camWidth,
+              camHeight,
+            );
+            ctx.restore();
+          }
         }
 
         requestAnimationFrame(draw);
@@ -251,45 +338,31 @@
         if (!webRTCAdaptor) initWebRTC();
       });
 
+      // --- LOGIC FOR WISHLIST LOG (Same as before) ---
       function addLogItem(productIndex) {
         if (emptyMsg) emptyMsg.style.display = "none";
-
         const product = products[productIndex];
         if (!product) return;
-
         const div = document.createElement("div");
         div.className = "log-item";
         div.setAttribute("data-index", productIndex);
-
         const now = new Date();
         const timeString =
-          now.getHours() +
-          ":" +
-          String(now.getMinutes()).padStart(2, "0") +
-          ":" +
-          String(now.getSeconds()).padStart(2, "0");
-
-        div.innerHTML = `<strong>${product.name}</strong> added to a wishlist<span>${timeString}</span>`;
-
+          now.getHours() + ":" + String(now.getMinutes()).padStart(2, "0");
+        div.innerHTML = `<strong>${product.name}</strong> added<span>${timeString}</span>`;
         wishlistLog.prepend(div);
       }
-
       function removeLogItem(productIndex) {
         const items = wishlistLog.querySelectorAll(
           `.log-item[data-index="${productIndex}"]`,
         );
-        if (items.length > 0) {
-          items[0].remove();
-        }
-
-        if (wishlistLog.querySelectorAll(".log-item").length === 0) {
-          if (emptyMsg) emptyMsg.style.display = "block";
-        }
+        if (items.length > 0) items[0].remove();
+        if (wishlistLog.querySelectorAll(".log-item").length === 0 && emptyMsg)
+          emptyMsg.style.display = "block";
       }
 
       function initWebRTC() {
         var localCanvasStream = canvas.captureStream(25);
-
         webRTCAdaptor = new WebRTCAdaptor({
           websocket_url: "wss://test.antmedia.io:5443/WebRTCAppEE/websocket",
           localStream: localCanvasStream,
@@ -300,35 +373,30 @@
               publishToggle.textContent = "Stop Publishing";
               publishToggle.classList.add("active-red");
 
-              setTimeout(() => {
-                videoBg.play().catch((e) => console.log(e));
-              }, 500);
-
-              startSyncHeartbeat();
+              if (!isWebcamMode) {
+                setTimeout(() => {
+                  videoBg.play().catch((e) => console.log(e));
+                }, 500);
+                startSyncHeartbeat();
+              }
             }
             if (info === "publish_finished") {
               isPublishing = false;
               publishToggle.textContent = "Start Publish";
               publishToggle.classList.remove("active-red");
-
               stopSyncHeartbeat();
               videoBg.pause();
             }
             if (info === "data_received") {
               try {
                 const data = JSON.parse(obj.data);
-                if (data.action === "wishlist_add") {
-                  addLogItem(data.index);
-                } else if (data.action === "wishlist_remove") {
+                if (data.action === "wishlist_add") addLogItem(data.index);
+                else if (data.action === "wishlist_remove")
                   removeLogItem(data.index);
-                }
-              } catch (e) {
-                console.error(e);
-              }
+              } catch (e) {}
             }
           },
           callbackError: (error, message) => {
-            console.error(error, message);
             isPublishing = false;
             publishToggle.textContent = "Start Publish";
             publishToggle.classList.remove("active-red");
@@ -340,9 +408,9 @@
 
       function startSyncHeartbeat() {
         if (syncInterval) clearInterval(syncInterval);
-
         syncInterval = setInterval(() => {
-          if (isPublishing) {
+          if (isPublishing && !isWebcamMode) {
+            // In Video mode, sync play/pause status
             const action = isBgPlaying ? "play" : "pause";
             sendSyncData(action);
           }
@@ -356,10 +424,10 @@
         }
       }
 
-      function sendSyncData(action) {
+      function sendSyncData(action, idx) {
         if (isPublishing && webRTCAdaptor) {
           try {
-            const payload = JSON.stringify({ action: action });
+            const payload = JSON.stringify({ action: action, index: idx });
             webRTCAdaptor.sendData(streamId, payload);
           } catch (e) {
             console.error(e);
@@ -367,12 +435,48 @@
         }
       }
 
+      // --- UI EVENT LISTENERS ---
+
+      modeToggle.addEventListener("click", () => {
+        isWebcamMode = !isWebcamMode;
+
+        if (isWebcamMode) {
+          // Switch TO Webcam Mode
+          modeToggle.textContent = "Switch to Video Mode";
+          modeToggle.classList.add("active-blue");
+          videoControls.style.display = "none";
+          productSelector.classList.add("visible");
+
+          // Pause BG video logic
+          videoBg.pause();
+          isBgPlaying = false;
+
+          // Stop auto-sync heartbeat (so it doesn't override manual selection)
+          stopSyncHeartbeat();
+
+          // Force first product
+          setManualProduct(0);
+        } else {
+          // Switch BACK to Video Mode
+          modeToggle.textContent = "Switch to Webcam Mode";
+          modeToggle.classList.remove("active-blue");
+          videoControls.style.display = "flex";
+          productSelector.classList.remove("visible");
+
+          // Resume Video Logic
+          if (isPublishing) {
+            videoBg.play();
+            startSyncHeartbeat();
+          }
+        }
+      });
+
       videoBg.addEventListener("play", () => {
         isBgPlaying = true;
         bgToggle.textContent = "Stop Background";
         bgToggle.classList.remove("active-green");
         bgToggle.classList.add("active-red");
-        sendSyncData("play");
+        if (!isWebcamMode) sendSyncData("play");
       });
 
       videoBg.addEventListener("pause", () => {
@@ -380,24 +484,18 @@
         bgToggle.textContent = "Play Background";
         bgToggle.classList.remove("active-red");
         bgToggle.classList.add("active-green");
-        sendSyncData("pause");
+        if (!isWebcamMode) sendSyncData("pause");
       });
 
       publishToggle.addEventListener("click", () => {
         if (!webRTCAdaptor) return;
-        if (isPublishing) {
-          webRTCAdaptor.stop(streamId);
-        } else {
-          webRTCAdaptor.publish(streamId);
-        }
+        if (isPublishing) webRTCAdaptor.stop(streamId);
+        else webRTCAdaptor.publish(streamId);
       });
 
       bgToggle.addEventListener("click", () => {
-        if (isBgPlaying) {
-          videoBg.pause();
-        } else {
-          videoBg.play();
-        }
+        if (isBgPlaying) videoBg.pause();
+        else videoBg.play();
       });
 
       resizeCanvas();

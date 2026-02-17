@@ -43,6 +43,7 @@
         pointer-events: auto;
       }
 
+      /* Wishlist Styles */
       .wishlist-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
@@ -105,6 +106,7 @@
         background: rgba(220, 38, 38, 0.9);
       }
 
+      /* Carousel & Product Styles */
       .carousel-box {
         background: rgba(0, 0, 0, 0.55);
         backdrop-filter: blur(10px);
@@ -282,10 +284,19 @@
           if (info === "data_received") {
             try {
               const data = JSON.parse(obj.data);
+
               if (data.action === "play") {
+                // From Video Mode: Resume automatic rotation
                 startCarousel();
               } else if (data.action === "pause") {
+                // From Video Mode: Pause automatic rotation
                 stopCarousel();
+              } else if (data.action === "force_product") {
+                // From Webcam Mode: Stop auto rotation and jump to specific product
+                stopCarousel();
+                carouselIndex = data.index;
+                updateCarousel();
+                updateProduct();
               }
             } catch (e) {
               console.error(e);
@@ -293,7 +304,6 @@
           }
         },
         callbackError: (error, message) => {
-          console.error("Player error:", error, message);
           if (error === "no_stream_exist") {
             statusEl.textContent = "Stream not available. Retrying...";
             if (!isRetrying) {
@@ -353,6 +363,7 @@
         "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=200&h=120&fit=crop",
       ];
 
+      // UI Elements
       const imgLeft = document.getElementById("carouselLeft");
       const imgCenter = document.getElementById("carouselCenter");
       const imgRight = document.getElementById("carouselRight");
@@ -409,10 +420,7 @@
       function sendData(action, idx) {
         try {
           if (webRTCAdaptor) {
-            const payload = JSON.stringify({
-              action: action,
-              index: idx,
-            });
+            const payload = JSON.stringify({ action: action, index: idx });
             webRTCAdaptor.sendData(streamId, payload);
           }
         } catch (e) {
@@ -429,22 +437,13 @@
         var html = "";
         wishlist.forEach((idx) => {
           var p = products[idx];
-          html +=
-            '<div class="wishlist-item">' +
-            '<div class="wishlist-item-info">' +
-            '<span class="wishlist-item-name">' +
-            p.name +
-            "</span>" +
-            '<span class="wishlist-item-price">' +
-            p.brand +
-            " — € " +
-            p.price +
-            "</span>" +
-            "</div>" +
-            '<button class="wishlist-item-remove" data-index="' +
-            idx +
-            '">Remove</button>' +
-            "</div>";
+          html += `<div class="wishlist-item">
+            <div class="wishlist-item-info">
+              <span class="wishlist-item-name">${p.name}</span>
+              <span class="wishlist-item-price">${p.brand} — € ${p.price}</span>
+            </div>
+            <button class="wishlist-item-remove" data-index="${idx}">Remove</button>
+          </div>`;
         });
         wishlistItemsEl.innerHTML = html;
         wishlistItemsEl
@@ -455,7 +454,7 @@
               var pos = wishlist.indexOf(i);
               if (pos !== -1) {
                 wishlist.splice(pos, 1);
-                sendData("wishlist_remove", i); // Notify presenter
+                sendData("wishlist_remove", i);
               }
               renderWishlist();
               updateWishlistBtn();
@@ -468,11 +467,11 @@
           var pos = wishlist.indexOf(carouselIndex);
           if (pos !== -1) {
             wishlist.splice(pos, 1);
-            sendData("wishlist_remove", carouselIndex); // Notify presenter
+            sendData("wishlist_remove", carouselIndex);
           }
         } else {
           wishlist.push(carouselIndex);
-          sendData("wishlist_add", carouselIndex); // Notify presenter
+          sendData("wishlist_add", carouselIndex);
         }
         renderWishlist();
         updateWishlistBtn();
