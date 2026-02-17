@@ -406,6 +406,20 @@
         }
       }
 
+      function sendData(action, idx) {
+        try {
+          if (webRTCAdaptor) {
+            const payload = JSON.stringify({
+              action: action,
+              index: idx,
+            });
+            webRTCAdaptor.sendData(streamId, payload);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       function renderWishlist() {
         if (wishlist.length === 0) {
           wishlistItemsEl.innerHTML =
@@ -439,7 +453,10 @@
             btn.addEventListener("click", () => {
               var i = parseInt(btn.getAttribute("data-index"));
               var pos = wishlist.indexOf(i);
-              if (pos !== -1) wishlist.splice(pos, 1);
+              if (pos !== -1) {
+                wishlist.splice(pos, 1);
+                sendData("wishlist_remove", i); // Notify presenter
+              }
               renderWishlist();
               updateWishlistBtn();
             });
@@ -449,21 +466,13 @@
       wishlistBtn.addEventListener("click", () => {
         if (isInWishlist(carouselIndex)) {
           var pos = wishlist.indexOf(carouselIndex);
-          if (pos !== -1) wishlist.splice(pos, 1);
+          if (pos !== -1) {
+            wishlist.splice(pos, 1);
+            sendData("wishlist_remove", carouselIndex); // Notify presenter
+          }
         } else {
           wishlist.push(carouselIndex);
-          // Send data to presenter
-          try {
-            if (webRTCAdaptor) {
-              const payload = JSON.stringify({
-                action: "wishlist_add",
-                index: carouselIndex,
-              });
-              webRTCAdaptor.sendData(streamId, payload);
-            }
-          } catch (e) {
-            console.error(e);
-          }
+          sendData("wishlist_add", carouselIndex); // Notify presenter
         }
         renderWishlist();
         updateWishlistBtn();

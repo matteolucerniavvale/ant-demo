@@ -90,11 +90,11 @@
       }
       .wishlist-recap {
         position: absolute;
-        top: 10px;
-        right: 10px;
+        bottom: 20px;
+        left: 20px;
         z-index: 1;
         width: 260px;
-        max-height: 400px;
+        max-height: 300px;
         background: rgba(15, 15, 15, 0.85);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -153,7 +153,10 @@
     <div class="wishlist-recap">
       <h3>Live Wishlist Activity</h3>
       <div class="wishlist-log" id="wishlistLog">
-        <div style="font-size: 12px; color: #666; font-style: italic">
+        <div
+          style="font-size: 12px; color: #666; font-style: italic"
+          id="emptyMsg"
+        >
           No items added yet...
         </div>
       </div>
@@ -169,6 +172,7 @@
       const publishToggle = document.getElementById("publishToggle");
       const bgToggle = document.getElementById("bgToggle");
       const wishlistLog = document.getElementById("wishlistLog");
+      const emptyMsg = document.getElementById("emptyMsg");
 
       var streamId = "streamCanvas";
       var webRTCAdaptor;
@@ -248,18 +252,14 @@
       });
 
       function addLogItem(productIndex) {
-        if (
-          wishlistLog.children.length > 0 &&
-          wishlistLog.children[0].style.fontStyle === "italic"
-        ) {
-          wishlistLog.innerHTML = "";
-        }
+        if (emptyMsg) emptyMsg.style.display = "none";
 
         const product = products[productIndex];
         if (!product) return;
 
         const div = document.createElement("div");
         div.className = "log-item";
+        div.setAttribute("data-index", productIndex);
 
         const now = new Date();
         const timeString =
@@ -272,6 +272,19 @@
         div.innerHTML = `<strong>${product.name}</strong> added to a wishlist<span>${timeString}</span>`;
 
         wishlistLog.prepend(div);
+      }
+
+      function removeLogItem(productIndex) {
+        const items = wishlistLog.querySelectorAll(
+          `.log-item[data-index="${productIndex}"]`,
+        );
+        if (items.length > 0) {
+          items[0].remove();
+        }
+
+        if (wishlistLog.querySelectorAll(".log-item").length === 0) {
+          if (emptyMsg) emptyMsg.style.display = "block";
+        }
       }
 
       function initWebRTC() {
@@ -306,6 +319,8 @@
                 const data = JSON.parse(obj.data);
                 if (data.action === "wishlist_add") {
                   addLogItem(data.index);
+                } else if (data.action === "wishlist_remove") {
+                  removeLogItem(data.index);
                 }
               } catch (e) {
                 console.error(e);
