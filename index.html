@@ -75,7 +75,6 @@
         text-decoration: none;
         margin-top: 4px;
       }
-
       .wishlist-recap {
         position: absolute;
         bottom: 20px;
@@ -120,7 +119,6 @@
         font-size: 10px;
         margin-top: 2px;
       }
-
       .product-selector {
         position: absolute;
         bottom: 30px;
@@ -172,7 +170,6 @@
         border-radius: 4px;
         display: block;
       }
-
       .on-air-badge {
         position: absolute;
         top: 20px;
@@ -256,13 +253,11 @@
       const webcam = document.getElementById("webcam");
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
-
       const publishToggle = document.getElementById("publishToggle");
       const bgToggle = document.getElementById("bgToggle");
       const modeToggle = document.getElementById("modeToggle");
       const videoControls = document.getElementById("videoControls");
       const productSelector = document.getElementById("productSelector");
-
       const wishlistLog = document.getElementById("wishlistLog");
       const emptyMsg = document.getElementById("emptyMsg");
       const onAirBadge = document.getElementById("onAirBadge");
@@ -276,6 +271,7 @@
       var syncInterval = null;
       var presenterCarouselIndex = 0;
       var presenterCarouselInterval = null;
+      var microphoneStream = null;
 
       const products = [
         { name: "Aviator Classic", brand: "Ray-Ban" },
@@ -310,13 +306,11 @@
       function setManualProduct(index) {
         presenterCarouselIndex = index;
         updateOnAirBadge();
-
         const buttons = productSelector.querySelectorAll(".prod-btn");
         buttons.forEach((b, i) => {
           if (i === index) b.classList.add("active");
           else b.classList.remove("active");
         });
-
         sendSyncData("force_product", index);
       }
 
@@ -342,9 +336,14 @@
       window.addEventListener("resize", resizeCanvas);
 
       navigator.mediaDevices
-        .getUserMedia({ video: { width: 1280, height: 720 } })
+        .getUserMedia({
+          video: { width: 1280, height: 720 },
+          audio: true,
+        })
         .then((stream) => {
           webcam.srcObject = stream;
+          microphoneStream = stream;
+          if (videoBg.readyState >= 2) initWebRTC();
         })
         .catch((err) => console.error(err));
 
@@ -389,7 +388,7 @@
 
       videoBg.addEventListener("loadedmetadata", () => {
         resizeCanvas();
-        if (!webRTCAdaptor) initWebRTC();
+        if (!webRTCAdaptor && microphoneStream) initWebRTC();
       });
 
       function updateUI() {
@@ -405,7 +404,6 @@
         if (isWebcamMode && isPublishing)
           productSelector.classList.add("visible");
         else productSelector.classList.remove("visible");
-
         if (!isWebcamMode && isPublishing && isBgPlaying) {
           onAirBadge.classList.add("visible");
           updateOnAirBadge();
@@ -427,6 +425,7 @@
         div.innerHTML = `<strong>${product.name}</strong> added<span>${timeString}</span>`;
         wishlistLog.prepend(div);
       }
+
       function removeLogItem(productIndex) {
         const items = wishlistLog.querySelectorAll(
           `.log-item[data-index="${productIndex}"]`,
@@ -437,7 +436,14 @@
       }
 
       function initWebRTC() {
+        if (webRTCAdaptor) return;
         var localCanvasStream = canvas.captureStream(25);
+        if (microphoneStream) {
+          microphoneStream
+            .getAudioTracks()
+            .forEach((track) => localCanvasStream.addTrack(track));
+        }
+
         webRTCAdaptor = new WebRTCAdaptor({
           websocket_url: "wss://test.antmedia.io:5443/WebRTCAppEE/websocket",
           localStream: localCanvasStream,
@@ -488,11 +494,11 @@
       function startSyncHeartbeat() {
         if (syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(() => {
-          if (isPublishing && !isWebcamMode) {
+          if (isPublishing && !isWebcamMode)
             sendSyncData("sync_status", presenterCarouselIndex);
-          }
         }, 2000);
       }
+
       function stopSyncHeartbeat() {
         if (syncInterval) {
           clearInterval(syncInterval);
@@ -536,14 +542,12 @@
       modeToggle.addEventListener("click", () => {
         isWebcamMode = !isWebcamMode;
         if (isWebcamMode) {
-          // --- MODE SWITCH: WEBCAM MODE ---
           videoBg.pause();
           isBgPlaying = false;
           stopSyncHeartbeat();
-          stopPresenterCarousel(); // <--- FIX: Ferma esplicitamente il timer automatico!
+          stopPresenterCarousel();
           setManualProduct(presenterCarouselIndex);
         } else {
-          // --- MODE SWITCH: VIDEO MODE ---
           if (isPublishing) {
             videoBg.play();
             startSyncHeartbeat();
@@ -588,7 +592,6 @@
       });
 
       resizeCanvas();
-      initWebRTC();
       draw();
       updateOnAirBadge();
     </script>

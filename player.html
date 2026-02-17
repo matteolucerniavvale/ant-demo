@@ -19,7 +19,6 @@
         background: #000;
         color: #fff;
       }
-
       #remoteVideo {
         position: absolute;
         top: 0;
@@ -30,8 +29,6 @@
         background: #000;
         z-index: 0;
       }
-
-      /* Overlay Desktop Default */
       .overlay {
         position: absolute;
         bottom: 40px;
@@ -48,15 +45,13 @@
       .overlay > * {
         pointer-events: auto;
       }
-
-      /* Play Overlay (Salvezza per schermo nero) */
       .play-overlay {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(0, 0, 0, 0.8);
         z-index: 10;
         display: none;
         align-items: center;
@@ -73,9 +68,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        transition:
-          transform 0.2s,
-          background 0.2s;
+        transition: transform 0.2s;
       }
       .play-btn-circle:after {
         content: "";
@@ -87,18 +80,25 @@
         border-bottom: 12px solid transparent;
         margin-left: 4px;
       }
-      .play-overlay:hover .play-btn-circle {
-        transform: scale(1.1);
-        background: rgba(255, 255, 255, 0.4);
-      }
       .play-text {
         margin-top: 20px;
         font-size: 16px;
         font-weight: 600;
-        letter-spacing: 1px;
       }
-
-      /* UI Elements Base Styles */
+      .audio-toggle {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 15;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        cursor: pointer;
+        backdrop-filter: blur(5px);
+      }
       .wishlist-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
@@ -110,7 +110,6 @@
         max-height: 300px;
         overflow-y: auto;
         flex-shrink: 0;
-        transition: transform 0.3s ease;
       }
       .wishlist-box h3 {
         font-size: 14px;
@@ -121,7 +120,6 @@
       .wishlist-empty {
         font-size: 12px;
         color: rgba(255, 255, 255, 0.35);
-        line-height: 1.5;
       }
       .wishlist-item {
         display: flex;
@@ -129,9 +127,6 @@
         justify-content: space-between;
         padding: 5px 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      .wishlist-item:last-child {
-        border-bottom: none;
       }
       .wishlist-item-info {
         display: flex;
@@ -154,10 +149,7 @@
         padding: 3px 8px;
         border-radius: 5px;
         cursor: pointer;
-        transition: background 0.2s;
-        flex-shrink: 0;
       }
-
       .carousel-box {
         background: rgba(0, 0, 0, 0.55);
         backdrop-filter: blur(10px);
@@ -176,15 +168,12 @@
         border-radius: 6px;
         opacity: 0.5;
         border: 2px solid transparent;
-        transition:
-          opacity 0.4s,
-          border-color 0.4s;
+        transition: 0.4s;
       }
       .carousel-box img.active {
         opacity: 1;
         border-color: #fff;
       }
-
       .product-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
@@ -239,7 +228,6 @@
         font-size: 13px;
         font-weight: 700;
         cursor: pointer;
-        transition: background 0.2s;
         color: #fff;
       }
       .product-btn.add {
@@ -248,7 +236,6 @@
       .product-btn.remove {
         background: rgba(220, 38, 38, 0.85);
       }
-
       .connecting {
         position: absolute;
         top: 50%;
@@ -258,50 +245,31 @@
         font-size: 16px;
         color: rgba(255, 255, 255, 0.6);
       }
-
-      /* --- MOBILE RESPONSIVE CSS --- */
       @media (max-width: 768px) {
         .overlay {
-          flex-direction: column; /* Impila elementi verticalmente */
+          flex-direction: column;
           justify-content: flex-end;
           align-items: center;
           bottom: 20px;
-          gap: 8px; /* Spazio ridotto tra le box */
+          gap: 8px;
         }
-
         .wishlist-box {
-          order: 1; /* Primo in alto nella pila (ma visivamente il più alto) */
+          order: 1;
           width: 95%;
-          max-width: 400px;
-          max-height: 120px; /* Altezza limitata per non coprire il video */
-          min-height: auto;
-          margin-bottom: 4px;
-          background: rgba(0, 0, 0, 0.6); /* Leggermente più trasparente */
+          max-height: 120px;
         }
-
         .carousel-box {
           order: 2;
           padding: 6px;
           gap: 6px;
-          margin-bottom: 4px;
         }
         .carousel-box img {
           width: 90px;
-          height: 60px; /* Rimpiccioliti */
+          height: 60px;
         }
-
         .product-box {
-          order: 3; /* In fondo allo schermo */
+          order: 3;
           width: 95%;
-          max-width: 400px;
-        }
-
-        /* Rimpiccioliamo un po' i testi su mobile */
-        .product-name {
-          font-size: 14px;
-        }
-        .product-price {
-          font-size: 15px;
         }
       }
     </style>
@@ -309,9 +277,12 @@
   <body>
     <video id="remoteVideo" autoplay muted playsinline></video>
     <div class="connecting" id="status">Connecting to stream...</div>
+
+    <button class="audio-toggle" id="audioToggle">🔇 Unmute Audio</button>
+
     <div class="play-overlay" id="playOverlay">
       <div class="play-btn-circle"></div>
-      <div class="play-text">Click to Start Stream</div>
+      <div class="play-text">Click to Join Live Session</div>
     </div>
 
     <div class="overlay">
@@ -321,13 +292,11 @@
           <span class="wishlist-empty">Your wishlist is empty.</span>
         </div>
       </div>
-
       <div class="carousel-box" id="carouselBox">
         <img id="carouselLeft" src="" alt="carousel" />
         <img id="carouselCenter" class="active" src="" alt="carousel" />
         <img id="carouselRight" src="" alt="carousel" />
       </div>
-
       <div class="product-box" id="productBox">
         <div class="product-top">
           <img class="product-thumb" id="productThumb" src="" alt="product" />
@@ -350,19 +319,29 @@
       const remoteVideo = document.getElementById("remoteVideo");
       const statusEl = document.getElementById("status");
       const playOverlay = document.getElementById("playOverlay");
+      const audioToggle = document.getElementById("audioToggle");
       var streamId = "streamCanvas";
       var isRetrying = false;
 
-      // Mobile UI Elements
-      const wishlistBox = document.getElementById("wishlistBox");
-      const wishlistItemsEl = document.getElementById("wishlistItems");
+      // FUNZIONE PER ABILITARE AUDIO
+      function enableAudio() {
+        remoteVideo.muted = false;
+        audioToggle.textContent = "🔊 Audio On";
+      }
+
+      audioToggle.addEventListener("click", () => {
+        remoteVideo.muted = !remoteVideo.muted;
+        audioToggle.textContent = remoteVideo.muted
+          ? "🔇 Unmute Audio"
+          : "🔊 Audio On";
+      });
 
       playOverlay.addEventListener("click", () => {
         remoteVideo
           .play()
           .then(() => {
             playOverlay.style.display = "none";
-            remoteVideo.muted = false;
+            enableAudio();
           })
           .catch((e) => console.error(e));
       });
@@ -371,19 +350,15 @@
         websocket_url: "wss://test.antmedia.io:5443/WebRTCAppEE/websocket",
         mediaConstraints: { video: false, audio: false },
         callback: (info, obj) => {
-          console.log("Player info:", info, obj);
           if (info === "initialized") webRTCAdaptor.play(streamId);
           if (info === "newStreamAvailable") {
             isRetrying = false;
             remoteVideo.srcObject = obj.stream;
             statusEl.style.display = "none";
             document.querySelector(".overlay").style.display = "flex";
-            const playPromise = remoteVideo.play();
-            if (playPromise !== undefined) {
-              playPromise.catch(() => {
-                playOverlay.style.display = "flex";
-              });
-            }
+            remoteVideo.play().catch(() => {
+              playOverlay.style.display = "flex";
+            });
           }
           if (info === "play_finished") {
             statusEl.textContent = "Stream ended";
@@ -531,12 +506,12 @@
       }
 
       function renderWishlist() {
+        const wishlistItemsEl = document.getElementById("wishlistItems");
         if (wishlist.length === 0) {
           wishlistItemsEl.innerHTML =
             '<span class="wishlist-empty">Your wishlist is empty.</span>';
           return;
         }
-
         var html = "";
         wishlist.forEach((idx) => {
           var p = products[idx];
