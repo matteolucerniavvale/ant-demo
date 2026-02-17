@@ -119,6 +119,7 @@
       var webRTCAdaptor;
       var isPublishing = false;
       var isBgPlaying = false;
+      var syncInterval = null;
 
       const BOTTOM_MARGIN = 50;
 
@@ -198,13 +199,18 @@
               publishToggle.textContent = "Stop Publishing";
               publishToggle.classList.add("active-red");
 
-              videoBg.play().catch((e) => console.log(e));
+              setTimeout(() => {
+                videoBg.play().catch((e) => console.log(e));
+              }, 500);
+
+              startSyncHeartbeat();
             }
             if (info === "publish_finished") {
               isPublishing = false;
               publishToggle.textContent = "Start Publish";
               publishToggle.classList.remove("active-red");
 
+              stopSyncHeartbeat();
               videoBg.pause();
             }
           },
@@ -213,9 +219,28 @@
             isPublishing = false;
             publishToggle.textContent = "Start Publish";
             publishToggle.classList.remove("active-red");
+            stopSyncHeartbeat();
             videoBg.pause();
           },
         });
+      }
+
+      function startSyncHeartbeat() {
+        if (syncInterval) clearInterval(syncInterval);
+
+        syncInterval = setInterval(() => {
+          if (isPublishing) {
+            const action = isBgPlaying ? "play" : "pause";
+            sendSyncData(action);
+          }
+        }, 2000);
+      }
+
+      function stopSyncHeartbeat() {
+        if (syncInterval) {
+          clearInterval(syncInterval);
+          syncInterval = null;
+        }
       }
 
       function sendSyncData(action) {
