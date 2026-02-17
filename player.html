@@ -31,6 +31,7 @@
       }
       .overlay {
         position: absolute;
+        top: 0;
         bottom: 40px;
         left: 0;
         right: 0;
@@ -245,31 +246,51 @@
         font-size: 16px;
         color: rgba(255, 255, 255, 0.6);
       }
+
       @media (max-width: 768px) {
         .overlay {
+          top: 60px;
+          bottom: 20px;
           flex-direction: column;
           justify-content: flex-end;
           align-items: center;
-          bottom: 20px;
           gap: 8px;
         }
         .wishlist-box {
           order: 1;
-          width: 95%;
-          max-height: 120px;
+          width: 90%;
+          max-height: 100px;
+          margin-bottom: auto;
+          background: rgba(0, 0, 0, 0.6);
         }
         .carousel-box {
           order: 2;
           padding: 6px;
           gap: 6px;
+          width: 90%;
+          justify-content: center;
         }
         .carousel-box img {
-          width: 90px;
-          height: 60px;
+          width: 80px;
+          height: 50px;
         }
         .product-box {
           order: 3;
-          width: 95%;
+          width: 90%;
+          padding: 10px;
+        }
+        .product-name {
+          font-size: 14px;
+        }
+        .product-thumb {
+          width: 70px;
+          height: 55px;
+        }
+        .audio-toggle {
+          top: 15px;
+          left: 15px;
+          padding: 6px 10px;
+          font-size: 10px;
         }
       }
     </style>
@@ -277,14 +298,11 @@
   <body>
     <video id="remoteVideo" autoplay muted playsinline></video>
     <div class="connecting" id="status">Connecting to stream...</div>
-
     <button class="audio-toggle" id="audioToggle">🔇 Unmute Audio</button>
-
     <div class="play-overlay" id="playOverlay">
       <div class="play-btn-circle"></div>
       <div class="play-text">Click to Join Live Session</div>
     </div>
-
     <div class="overlay">
       <div class="wishlist-box" id="wishlistBox">
         <h3>Wishlist</h3>
@@ -312,30 +330,24 @@
         </button>
       </div>
     </div>
-
     <script type="module">
       import { WebRTCAdaptor } from "https://cdn.skypack.dev/@antmedia/webrtc_adaptor@SNAPSHOT";
-
       const remoteVideo = document.getElementById("remoteVideo");
       const statusEl = document.getElementById("status");
       const playOverlay = document.getElementById("playOverlay");
       const audioToggle = document.getElementById("audioToggle");
       var streamId = "streamCanvas";
       var isRetrying = false;
-
-      // FUNZIONE PER ABILITARE AUDIO
       function enableAudio() {
         remoteVideo.muted = false;
         audioToggle.textContent = "🔊 Audio On";
       }
-
       audioToggle.addEventListener("click", () => {
         remoteVideo.muted = !remoteVideo.muted;
         audioToggle.textContent = remoteVideo.muted
           ? "🔇 Unmute Audio"
           : "🔊 Audio On";
       });
-
       playOverlay.addEventListener("click", () => {
         remoteVideo
           .play()
@@ -345,7 +357,6 @@
           })
           .catch((e) => console.error(e));
       });
-
       var webRTCAdaptor = new WebRTCAdaptor({
         websocket_url: "wss://test.antmedia.io:5443/WebRTCAppEE/websocket",
         mediaConstraints: { video: false, audio: false },
@@ -396,7 +407,6 @@
           }
         },
       });
-
       const products = [
         {
           name: "Aviator Classic",
@@ -434,7 +444,6 @@
           lens: "Polarized Grey",
         },
       ];
-
       const carouselSources = [
         "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=200&h=120&fit=crop",
         "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=200&h=120&fit=crop",
@@ -442,7 +451,6 @@
         "https://images.unsplash.com/photo-1509695507497-903c140c43b0?w=200&h=120&fit=crop",
         "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=200&h=120&fit=crop",
       ];
-
       const imgLeft = document.getElementById("carouselLeft");
       const imgCenter = document.getElementById("carouselCenter");
       const imgRight = document.getElementById("carouselRight");
@@ -452,38 +460,31 @@
       const productPrice = document.getElementById("productPrice");
       const productDetails = document.getElementById("productDetails");
       const wishlistBtn = document.getElementById("wishlistBtn");
-
       let carouselIndex = 0;
       let wishlist = [];
-
       function getIndex(offset) {
         return (
           (carouselIndex + offset + carouselSources.length) %
           carouselSources.length
         );
       }
-
       function updateCarousel() {
         imgLeft.src = carouselSources[getIndex(-1)];
         imgCenter.src = carouselSources[getIndex(0)];
         imgRight.src = carouselSources[getIndex(1)];
       }
-
       function updateProduct() {
         var p = products[carouselIndex];
         productThumb.src = carouselSources[carouselIndex];
         productName.textContent = p.name;
         productBrand.textContent = p.brand;
         productPrice.textContent = "€ " + p.price;
-        productDetails.textContent =
-          "Color: " + p.color + "  |  Lens: " + p.lens;
+        productDetails.textContent = "Color: " + p.color + " | Lens: " + p.lens;
         updateWishlistBtn();
       }
-
       function isInWishlist(index) {
         return wishlist.indexOf(index) !== -1;
       }
-
       function updateWishlistBtn() {
         if (isInWishlist(carouselIndex)) {
           wishlistBtn.textContent = "Remove from Wishlist";
@@ -493,18 +494,14 @@
           wishlistBtn.className = "product-btn add";
         }
       }
-
       function sendData(action, idx) {
         try {
           if (webRTCAdaptor) {
             const payload = JSON.stringify({ action: action, index: idx });
             webRTCAdaptor.sendData(streamId, payload);
           }
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) {}
       }
-
       function renderWishlist() {
         const wishlistItemsEl = document.getElementById("wishlistItems");
         if (wishlist.length === 0) {
@@ -533,7 +530,6 @@
             });
           });
       }
-
       wishlistBtn.addEventListener("click", () => {
         if (isInWishlist(carouselIndex)) {
           var pos = wishlist.indexOf(carouselIndex);
@@ -548,7 +544,6 @@
         renderWishlist();
         updateWishlistBtn();
       });
-
       updateCarousel();
       updateProduct();
     </script>
