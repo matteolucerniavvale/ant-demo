@@ -112,24 +112,11 @@
         flex-shrink: 0;
         transition: transform 0.3s ease;
       }
-      .wishlist-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-      }
       .wishlist-box h3 {
         font-size: 14px;
         font-weight: 600;
+        margin-bottom: 8px;
         color: rgba(255, 255, 255, 0.9);
-      }
-      .close-wishlist-btn {
-        display: none;
-        background: none;
-        border: none;
-        color: white;
-        font-size: 20px;
-        cursor: pointer;
       }
       .wishlist-empty {
         font-size: 12px;
@@ -272,39 +259,6 @@
         color: rgba(255, 255, 255, 0.6);
       }
 
-      /* Mobile Toggle Button (Hidden on Desktop) */
-      .mobile-wishlist-toggle {
-        display: none;
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        z-index: 20;
-        background: rgba(0, 0, 0, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        color: white;
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        font-size: 20px;
-        cursor: pointer;
-        backdrop-filter: blur(5px);
-      }
-      .badge {
-        position: absolute;
-        top: -2px;
-        right: -2px;
-        background: red;
-        color: white;
-        font-size: 10px;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-      }
-
       /* --- MOBILE RESPONSIVE CSS --- */
       @media (max-width: 768px) {
         .overlay {
@@ -312,53 +266,42 @@
           justify-content: flex-end;
           align-items: center;
           bottom: 20px;
-          gap: 12px;
+          gap: 8px; /* Spazio ridotto tra le box */
         }
 
-        /* Nascondi la wishlist standard su mobile, la mostreremo come modale */
         .wishlist-box {
-          position: fixed;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          max-height: none;
-          background: rgba(0, 0, 0, 0.95);
-          z-index: 30;
-          border-radius: 0;
-          display: none; /* Inizialmente nascosta */
-          padding: 20px;
-        }
-        .wishlist-box.open {
-          display: block;
-        }
-        .close-wishlist-btn {
-          display: block;
-        } /* Mostra la X per chiudere */
-
-        /* Bottone galleggiante visibile solo su mobile */
-        .mobile-wishlist-toggle {
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          order: 1; /* Primo in alto nella pila (ma visivamente il più alto) */
+          width: 95%;
+          max-width: 400px;
+          max-height: 120px; /* Altezza limitata per non coprire il video */
+          min-height: auto;
+          margin-bottom: 4px;
+          background: rgba(0, 0, 0, 0.6); /* Leggermente più trasparente */
         }
 
-        /* Carosello più piccolo */
         .carousel-box {
+          order: 2;
           padding: 6px;
           gap: 6px;
+          margin-bottom: 4px;
         }
         .carousel-box img {
           width: 90px;
           height: 60px; /* Rimpiccioliti */
         }
 
-        /* Product box quasi full width */
         .product-box {
+          order: 3; /* In fondo allo schermo */
           width: 95%;
           max-width: 400px;
+        }
+
+        /* Rimpiccioliamo un po' i testi su mobile */
+        .product-name {
+          font-size: 14px;
+        }
+        .product-price {
+          font-size: 15px;
         }
       }
     </style>
@@ -371,17 +314,9 @@
       <div class="play-text">Click to Start Stream</div>
     </div>
 
-    <button class="mobile-wishlist-toggle" id="mobileWishlistToggle">
-      ♥
-      <div class="badge" id="wishlistBadge">0</div>
-    </button>
-
     <div class="overlay">
       <div class="wishlist-box" id="wishlistBox">
-        <div class="wishlist-header">
-          <h3>Your Wishlist</h3>
-          <button class="close-wishlist-btn" id="closeWishlist">✕</button>
-        </div>
+        <h3>Wishlist</h3>
         <div id="wishlistItems">
           <span class="wishlist-empty">Your wishlist is empty.</span>
         </div>
@@ -419,20 +354,8 @@
       var isRetrying = false;
 
       // Mobile UI Elements
-      const mobileWishlistToggle = document.getElementById(
-        "mobileWishlistToggle",
-      );
       const wishlistBox = document.getElementById("wishlistBox");
-      const closeWishlist = document.getElementById("closeWishlist");
-      const wishlistBadge = document.getElementById("wishlistBadge");
-
-      // Mobile: Toggle Wishlist
-      mobileWishlistToggle.addEventListener("click", () => {
-        wishlistBox.classList.add("open");
-      });
-      closeWishlist.addEventListener("click", () => {
-        wishlistBox.classList.remove("open");
-      });
+      const wishlistItemsEl = document.getElementById("wishlistItems");
 
       playOverlay.addEventListener("click", () => {
         remoteVideo
@@ -554,7 +477,6 @@
       const productPrice = document.getElementById("productPrice");
       const productDetails = document.getElementById("productDetails");
       const wishlistBtn = document.getElementById("wishlistBtn");
-      const wishlistItemsEl = document.getElementById("wishlistItems");
 
       let carouselIndex = 0;
       let wishlist = [];
@@ -612,13 +534,8 @@
         if (wishlist.length === 0) {
           wishlistItemsEl.innerHTML =
             '<span class="wishlist-empty">Your wishlist is empty.</span>';
-          wishlistBadge.style.display = "none";
           return;
         }
-
-        // Update Badge
-        wishlistBadge.textContent = wishlist.length;
-        wishlistBadge.style.display = "flex";
 
         var html = "";
         wishlist.forEach((idx) => {
