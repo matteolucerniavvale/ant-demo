@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canvas Stream</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: sans-serif;
+        background: #000;
+      }
+      video {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+      canvas {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 0;
+        cursor: pointer;
+      }
+      .controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1;
+        background: rgba(15, 15, 15, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 14px 18px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .controls .btn-row {
+        display: flex;
+        gap: 6px;
+      }
+      .controls button {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          border-color 0.2s;
+      }
+      .controls button:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+      .controls button:active {
+        background: rgba(255, 255, 255, 0.28);
+      }
+      .controls button.active-red {
+        background: rgba(220, 38, 38, 0.8);
+        border-color: rgba(220, 38, 38, 0.9);
+      }
+      .controls button.active-red:hover {
+        background: rgba(220, 38, 38, 0.95);
+      }
+      .controls button.active-green {
+        background: rgba(34, 160, 70, 0.8);
+        border-color: rgba(34, 160, 70, 0.9);
+      }
+      .controls button.active-green:hover {
+        background: rgba(34, 160, 70, 0.95);
+      }
+      .controls a {
+        display: inline-block;
+        color: #8ab4f8;
+        font-size: 13px;
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      .controls a:hover {
+        color: #aecbfa;
+        text-decoration: underline;
+      }
+      .wishlist-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1;
+        background: rgba(15, 15, 15, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 14px 18px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #fff;
+        min-width: 220px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .wishlist-panel h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .wishlist-panel .empty {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+      .wishlist-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .wishlist-item:last-child {
+        border-bottom: none;
+      }
+      .wishlist-item-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .wishlist-item-name {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .wishlist-item-price {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .wishlist-item-remove {
+        background: rgba(220, 38, 38, 0.6);
+        border: none;
+        color: #fff;
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .wishlist-item-remove:hover {
+        background: rgba(220, 38, 38, 0.9);
+      }
+    </style>
+  </head>
+  <body>
+    <video
+      id="videoBg"
+      src="./background.mp4"
+      autoplay
+      muted
+      loop
+      playsinline
+    ></video>
+    <video id="webcam" autoplay muted playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+      <div class="btn-row">
+        <button id="bgToggle" class="active-green">Stop Background</button>
+      </div>
+      <div class="btn-row">
+        <button id="publishToggle">Start Publish</button>
+      </div>
+      <a
+        href="https://test.antmedia.io:5443/WebRTCAppEE/play.html?name=streamCanvas"
+        target="_blank"
+        >Open Player</a
+      >
+    </div>
+
+    <div class="wishlist-panel" id="wishlistPanel">
+      <h3>Wishlist</h3>
+      <div id="wishlistItems"><span class="empty">No items yet</span></div>
+    </div>
+
+    <script type="module">
+      import { WebRTCAdaptor } from "https://cdn.skypack.dev/@antmedia/webrtc_adaptor@SNAPSHOT";
+
+      const videoBg = document.getElementById("videoBg");
+      const webcam = document.getElementById("webcam");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const publishToggle = document.getElementById("publishToggle");
+      const bgToggle = document.getElementById("bgToggle");
+      const wishlistItemsEl = document.getElementById("wishlistItems");
+
+      var streamId = "streamCanvas";
+      var webRTCAdaptor;
+      var isPublishing = false;
+      var isBgPlaying = true;
+      var wishlist = [];
+
+      var addBtnBounds = { x: 0, y: 0, w: 0, h: 0 };
+
+      const products = [
+        {
+          name: "Aviator Classic",
+          brand: "Ray-Ban",
+          price: "159.00",
+          color: "Gold / Green",
+          lens: "Polarized G-15",
+        },
+        {
+          name: "Wayfarer Original",
+          brand: "Ray-Ban",
+          price: "139.00",
+          color: "Black / Crystal",
+          lens: "Standard Green",
+        },
+        {
+          name: "Clubmaster Metal",
+          brand: "Ray-Ban",
+          price: "179.00",
+          color: "Silver / Blue",
+          lens: "Gradient Blue",
+        },
+        {
+          name: "Round Double Bridge",
+          brand: "Ray-Ban",
+          price: "189.00",
+          color: "Bronze / Pink",
+          lens: "Mirror Pink",
+        },
+        {
+          name: "Hexagonal Flat",
+          brand: "Ray-Ban",
+          price: "169.00",
+          color: "Gunmetal / Grey",
+          lens: "Polarized Grey",
+        },
+      ];
+
+      function roundedRect(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x, y + h, x, y + h - r, r);
+        ctx.lineTo(x, y + r);
+        ctx.arcTo(x, y, x + r, y, r);
+        ctx.closePath();
+      }
+
+      function resizeCanvas() {
+        if (!canvas.width || !canvas.height) return;
+        var ratio = canvas.width / canvas.height;
+        var winW = window.innerWidth;
+        var winH = window.innerHeight;
+        var winRatio = winW / winH;
+        if (winRatio > ratio) {
+          canvas.style.height = winH + "px";
+          canvas.style.width = Math.round(winH * ratio) + "px";
+        } else {
+          canvas.style.width = winW + "px";
+          canvas.style.height = Math.round(winW / ratio) + "px";
+        }
+      }
+
+      window.addEventListener("resize", resizeCanvas);
+
+      function getCanvasCoords(e) {
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+        return {
+          x: (e.clientX - rect.left) * scaleX,
+          y: (e.clientY - rect.top) * scaleY,
+        };
+      }
+
+      canvas.addEventListener("click", (e) => {
+        var pos = getCanvasCoords(e);
+        var b = addBtnBounds;
+        if (
+          pos.x >= b.x &&
+          pos.x <= b.x + b.w &&
+          pos.y >= b.y &&
+          pos.y <= b.y + b.h
+        ) {
+          toggleWishlist(carouselIndex);
+        }
+      });
+
+      function isInWishlist(index) {
+        return wishlist.indexOf(index) !== -1;
+      }
+
+      function toggleWishlist(index) {
+        var pos = wishlist.indexOf(index);
+        if (pos === -1) {
+          wishlist.push(index);
+        } else {
+          wishlist.splice(pos, 1);
+        }
+        renderWishlistPanel();
+      }
+
+      function removeFromWishlist(index) {
+        var pos = wishlist.indexOf(index);
+        if (pos !== -1) {
+          wishlist.splice(pos, 1);
+        }
+        renderWishlistPanel();
+      }
+
+      function renderWishlistPanel() {
+        if (wishlist.length === 0) {
+          wishlistItemsEl.innerHTML = '<span class="empty">No items yet</span>';
+          return;
+        }
+        var html = "";
+        wishlist.forEach((idx) => {
+          var p = products[idx];
+          html +=
+            '<div class="wishlist-item">' +
+            '<div class="wishlist-item-info">' +
+            '<span class="wishlist-item-name">' +
+            p.name +
+            "</span>" +
+            '<span class="wishlist-item-price">' +
+            p.brand +
+            " — € " +
+            p.price +
+            "</span>" +
+            "</div>" +
+            '<button class="wishlist-item-remove" data-index="' +
+            idx +
+            '">Remove</button>' +
+            "</div>";
+        });
+        wishlistItemsEl.innerHTML = html;
+        wishlistItemsEl
+          .querySelectorAll(".wishlist-item-remove")
+          .forEach((btn) => {
+            btn.addEventListener("click", () => {
+              removeFromWishlist(parseInt(btn.getAttribute("data-index")));
+            });
+          });
+      }
+
+      navigator.mediaDevices
+        .getUserMedia({
+          video: { width: 640, height: 480 },
+        })
+        .then((stream) => {
+          webcam.srcObject = stream;
+        })
+        .catch((err) => console.error("Webcam error:", err));
+
+      videoBg.addEventListener("loadedmetadata", () => {
+        canvas.width = videoBg.videoWidth;
+        canvas.height = videoBg.videoHeight;
+        resizeCanvas();
+        draw();
+
+        var localCanvasStream = canvas.captureStream(25);
+
+        webRTCAdaptor = new WebRTCAdaptor({
+          websocket_url: "wss://test.antmedia.io:5443/WebRTCAppEE/websocket",
+          localStream: localCanvasStream,
+          callback: (info, obj) => {
+            console.log("WebRTC info:", info, obj);
+            if (info === "publish_started") {
+              isPublishing = true;
+              publishToggle.textContent = "Stop Publishing";
+              publishToggle.classList.add("active-red");
+            }
+            if (info === "publish_finished") {
+              isPublishing = false;
+              publishToggle.textContent = "Start Publish";
+              publishToggle.classList.remove("active-red");
+            }
+          },
+          callbackError: (error, message) => {
+            console.error("WebRTC error:", error, message);
+            isPublishing = false;
+            publishToggle.textContent = "Start Publish";
+            publishToggle.classList.remove("active-red");
+          },
+        });
+      });
+
+      videoBg.addEventListener("play", () => {
+        isBgPlaying = true;
+        bgToggle.textContent = "Stop Background";
+        bgToggle.classList.remove("active-red");
+        bgToggle.classList.add("active-green");
+        startCarousel();
+      });
+
+      videoBg.addEventListener("pause", () => {
+        isBgPlaying = false;
+        bgToggle.textContent = "Play Background";
+        bgToggle.classList.remove("active-green");
+        bgToggle.classList.add("active-red");
+        stopCarousel();
+      });
+
+      const carouselSources = [
+        "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1577803645773-f96470509666?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1509695507497-903c140c43b0?w=200&h=120&fit=crop",
+        "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=200&h=120&fit=crop",
+      ];
+
+      const carouselImages = [];
+      let carouselIndex = 0;
+      let carouselInterval = null;
+
+      carouselSources.forEach((src) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = src;
+        carouselImages.push(img);
+      });
+
+      function getIndex(offset) {
+        return (
+          (carouselIndex + offset + carouselImages.length) %
+          carouselImages.length
+        );
+      }
+
+      function drawCarousel() {
+        const imgW = 160;
+        const imgH = 100;
+        const gap = 10;
+        const totalW = imgW * 3 + gap * 2;
+        const startX = (canvas.width - totalW) / 2;
+        const y = canvas.height - imgH - 14;
+        const radius = 6;
+        const bgPad = 8;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        roundedRect(
+          startX - bgPad,
+          y - bgPad,
+          totalW + bgPad * 2,
+          imgH + bgPad * 2,
+          10,
+        );
+        ctx.fill();
+        ctx.restore();
+
+        const positions = [
+          { index: getIndex(-1), x: startX, active: false },
+          { index: getIndex(0), x: startX + imgW + gap, active: true },
+          { index: getIndex(1), x: startX + imgW * 2 + gap * 2, active: false },
+        ];
+
+        positions.forEach((pos) => {
+          const img = carouselImages[pos.index];
+          if (!img || !img.complete || !img.naturalWidth) return;
+
+          ctx.save();
+          ctx.globalAlpha = pos.active ? 1 : 0.5;
+          roundedRect(pos.x, y, imgW, imgH, radius);
+          ctx.clip();
+          ctx.drawImage(img, pos.x, y, imgW, imgH);
+          ctx.restore();
+
+          if (pos.active) {
+            ctx.save();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 3;
+            roundedRect(pos.x, y, imgW, imgH, radius);
+            ctx.stroke();
+            ctx.restore();
+          }
+        });
+      }
+
+      function drawProductDetail() {
+        const product = products[carouselIndex];
+        const img = carouselImages[carouselIndex];
+        const inWish = isInWishlist(carouselIndex);
+
+        const boxW = 280;
+        const boxH = 170;
+        const margin = 14;
+        const boxX = canvas.width - boxW - margin;
+        const boxY = canvas.height - boxH - margin - 120;
+        const radius = 10;
+        const thumbW = 90;
+        const thumbH = 70;
+        const textX = boxX + thumbW + 20;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        roundedRect(boxX, boxY, boxW, boxH, radius);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 1;
+        roundedRect(boxX, boxY, boxW, boxH, radius);
+        ctx.stroke();
+        ctx.restore();
+
+        if (img && img.complete && img.naturalWidth) {
+          ctx.save();
+          roundedRect(boxX + 12, boxY + 12, thumbW, thumbH, 6);
+          ctx.clip();
+          ctx.drawImage(img, boxX + 12, boxY + 12, thumbW, thumbH);
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText(product.name, textX, boxY + 30);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+        ctx.font = "13px sans-serif";
+        ctx.fillText(product.brand, textX, boxY + 50);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 18px sans-serif";
+        ctx.fillText("€ " + product.price, textX, boxY + 75);
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.font = "12px sans-serif";
+        ctx.fillText("Color: " + product.color, boxX + 12, boxY + 105);
+        ctx.fillText("Lens: " + product.lens, boxX + 12, boxY + 122);
+        ctx.restore();
+
+        var btnX = boxX + 12;
+        var btnY = boxY + 133;
+        var btnW = boxW - 24;
+        var btnH = 28;
+
+        addBtnBounds = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+        ctx.save();
+        if (inWish) {
+          ctx.fillStyle = "rgba(220, 38, 38, 0.85)";
+        } else {
+          ctx.fillStyle = "rgba(34, 160, 70, 0.85)";
+        }
+        roundedRect(btnX, btnY, btnW, btnH, 6);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 13px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        if (inWish) {
+          ctx.fillText(
+            "Remove from Wishlist",
+            btnX + btnW / 2,
+            btnY + btnH / 2,
+          );
+        } else {
+          ctx.fillText("Add to Wishlist", btnX + btnW / 2, btnY + btnH / 2);
+        }
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
+        ctx.restore();
+      }
+
+      function drawWishlistBox() {
+        if (wishlist.length === 0) return;
+
+        var margin = 14;
+        var itemH = 30;
+        var headerH = 30;
+        var pad = 10;
+        var boxW = 220;
+        var boxH = headerH + wishlist.length * itemH + pad;
+        var boxX = margin;
+        var boxY = canvas.height - boxH - margin - 120;
+        var radius = 10;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        roundedRect(boxX, boxY, boxW, boxH, radius);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 1;
+        roundedRect(boxX, boxY, boxW, boxH, radius);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 14px sans-serif";
+        ctx.fillText(
+          "Wishlist (" + wishlist.length + ")",
+          boxX + pad,
+          boxY + 22,
+        );
+        ctx.restore();
+
+        wishlist.forEach((idx, i) => {
+          var p = products[idx];
+          var yPos = boxY + headerH + i * itemH + 16;
+
+          ctx.save();
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "13px sans-serif";
+          ctx.fillText(p.name, boxX + pad, yPos);
+
+          ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+          ctx.font = "11px sans-serif";
+          ctx.fillText("€ " + p.price, boxX + pad + 150, yPos);
+          ctx.restore();
+        });
+      }
+
+      function draw() {
+        ctx.drawImage(videoBg, 0, 0, canvas.width, canvas.height);
+
+        const camWidth = 550;
+        const camHeight = 400;
+        ctx.drawImage(
+          webcam,
+          canvas.width - camWidth - 10,
+          10,
+          camWidth,
+          camHeight,
+        );
+
+        drawCarousel();
+        drawProductDetail();
+        drawWishlistBox();
+
+        requestAnimationFrame(draw);
+      }
+
+      function startCarousel() {
+        if (carouselInterval) return;
+        carouselInterval = setInterval(() => {
+          carouselIndex = (carouselIndex + 1) % carouselImages.length;
+        }, 3000);
+      }
+
+      function stopCarousel() {
+        clearInterval(carouselInterval);
+        carouselInterval = null;
+      }
+
+      if (!videoBg.paused) {
+        startCarousel();
+      }
+
+      publishToggle.addEventListener("click", () => {
+        if (!webRTCAdaptor) return;
+        if (isPublishing) {
+          webRTCAdaptor.stop(streamId);
+        } else {
+          webRTCAdaptor.publish(streamId);
+        }
+      });
+
+      bgToggle.addEventListener("click", () => {
+        if (isBgPlaying) {
+          videoBg.pause();
+        } else {
+          videoBg.play();
+        }
+      });
+    </script>
+  </body>
+</html>
