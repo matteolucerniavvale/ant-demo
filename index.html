@@ -25,7 +25,6 @@
         transform: translate(-50%, -50%);
         z-index: 0;
       }
-      /* CONTROLS (Top Left) */
       .controls {
         position: absolute;
         top: 10px;
@@ -33,7 +32,6 @@
         z-index: 2;
         background: rgba(15, 15, 15, 0.75);
         backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
         padding: 14px 18px;
         border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.12);
@@ -58,7 +56,6 @@
       .controls button:hover {
         background: rgba(255, 255, 255, 0.2);
       }
-      /* Active States */
       .controls button.active-red {
         background: rgba(220, 38, 38, 0.8);
         border-color: rgba(220, 38, 38, 0.9);
@@ -79,7 +76,6 @@
         margin-top: 4px;
       }
 
-      /* WISHLIST RECAP (Bottom Left) */
       .wishlist-recap {
         position: absolute;
         bottom: 20px;
@@ -125,7 +121,6 @@
         margin-top: 2px;
       }
 
-      /* MANUAL PRODUCT SELECTOR (Bottom Center) - Hidden by default */
       .product-selector {
         position: absolute;
         bottom: 30px;
@@ -136,7 +131,7 @@
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 12px;
         padding: 12px;
-        display: none; /* Hidden unless in Webcam Mode AND Publishing */
+        display: none;
         gap: 10px;
         max-width: 90vw;
         flex-wrap: wrap;
@@ -177,6 +172,44 @@
         border-radius: 4px;
         display: block;
       }
+
+      .on-air-badge {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(220, 38, 38, 0.9);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        z-index: 2;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      .on-air-badge.visible {
+        display: flex;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        background: white;
+        border-radius: 50%;
+        animation: blink 1s infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .on-air-text {
+        opacity: 0.9;
+        font-weight: 400;
+        margin-left: 4px;
+      }
     </style>
   </head>
   <body>
@@ -195,6 +228,11 @@
         <button id="publishToggle">Start Publish</button>
       </div>
       <a href="./player.html" target="_blank">Open Player</a>
+    </div>
+
+    <div class="on-air-badge" id="onAirBadge">
+      <div class="dot"></div>
+      ON AIR: <span id="onAirProductName" class="on-air-text">...</span>
     </div>
 
     <div class="product-selector" id="productSelector"></div>
@@ -227,6 +265,8 @@
 
       const wishlistLog = document.getElementById("wishlistLog");
       const emptyMsg = document.getElementById("emptyMsg");
+      const onAirBadge = document.getElementById("onAirBadge");
+      const onAirProductName = document.getElementById("onAirProductName");
 
       var streamId = "streamCanvas";
       var webRTCAdaptor;
@@ -234,7 +274,8 @@
       var isBgPlaying = false;
       var isWebcamMode = false;
       var syncInterval = null;
-      var currentManualIndex = 0;
+      var presenterCarouselIndex = 0;
+      var presenterCarouselInterval = null;
 
       const products = [
         { name: "Aviator Classic", brand: "Ray-Ban" },
@@ -252,34 +293,30 @@
         "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=200&h=120&fit=crop",
       ];
 
-      // --- SETUP PRODUCT BUTTONS ---
       products.forEach((p, idx) => {
         const btn = document.createElement("button");
         btn.className = "prod-btn";
-
         const img = document.createElement("img");
         img.src = carouselSources[idx];
         img.alt = p.name;
-
         const span = document.createElement("span");
         span.textContent = p.name;
-
         btn.appendChild(img);
         btn.appendChild(span);
-
         btn.onclick = () => setManualProduct(idx);
         productSelector.appendChild(btn);
       });
 
       function setManualProduct(index) {
-        currentManualIndex = index;
-        // Update visual active state
+        presenterCarouselIndex = index;
+        updateOnAirBadge();
+
         const buttons = productSelector.querySelectorAll(".prod-btn");
         buttons.forEach((b, i) => {
           if (i === index) b.classList.add("active");
           else b.classList.remove("active");
         });
-        // Send Data
+
         sendSyncData("force_product", index);
       }
 
@@ -290,7 +327,6 @@
           canvas.width = targetW;
           canvas.height = targetH;
         }
-
         var ratio = canvas.width / canvas.height;
         var winW = window.innerWidth;
         var winH = window.innerHeight;
@@ -314,37 +350,30 @@
 
       function drawWebcamCover() {
         if (webcam.readyState < 2) return;
-
         const cw = canvas.width;
         const ch = canvas.height;
         const vw = webcam.videoWidth;
         const vh = webcam.videoHeight;
-
         let scale = Math.max(cw / vw, ch / vh);
         let x = cw / 2 - (vw / 2) * scale;
         let y = ch / 2 - (vh / 2) * scale;
-
         ctx.drawImage(webcam, x, y, vw * scale, vh * scale);
       }
 
       function draw() {
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
         if (isWebcamMode) {
           drawWebcamCover();
         } else {
-          if (videoBg.readyState >= 2) {
+          if (videoBg.readyState >= 2)
             ctx.drawImage(videoBg, 0, 0, canvas.width, canvas.height);
-          }
+          const camWidth = 550;
+          const camHeight = 400;
           if (webcam.readyState >= 2) {
             ctx.save();
             ctx.shadowColor = "rgba(0,0,0,0.5)";
             ctx.shadowBlur = 10;
-            // Maintain webcam aspect ratio
-            const aspect = webcam.videoWidth / webcam.videoHeight;
-            const camWidth = 400 * aspect;
-            const camHeight = 400;
             ctx.drawImage(
               webcam,
               canvas.width - camWidth - 10,
@@ -355,7 +384,6 @@
             ctx.restore();
           }
         }
-
         requestAnimationFrame(draw);
       }
 
@@ -364,9 +392,7 @@
         if (!webRTCAdaptor) initWebRTC();
       });
 
-      // --- UI UPDATE FUNCTION (Centralized Logic) ---
       function updateUI() {
-        // Logic for Mode Button and Video Controls
         if (isWebcamMode) {
           modeToggle.textContent = "Switch to Video Mode";
           modeToggle.classList.add("active-blue");
@@ -376,13 +402,15 @@
           modeToggle.classList.remove("active-blue");
           videoControls.style.display = "flex";
         }
-
-        // Logic for Product Selector Visibility
-        // Show ONLY if Webcam Mode AND Publishing are true
-        if (isWebcamMode && isPublishing) {
+        if (isWebcamMode && isPublishing)
           productSelector.classList.add("visible");
+        else productSelector.classList.remove("visible");
+
+        if (!isWebcamMode && isPublishing && isBgPlaying) {
+          onAirBadge.classList.add("visible");
+          updateOnAirBadge();
         } else {
-          productSelector.classList.remove("visible");
+          onAirBadge.classList.remove("visible");
         }
       }
 
@@ -419,24 +447,22 @@
               isPublishing = true;
               publishToggle.textContent = "Stop Publishing";
               publishToggle.classList.add("active-red");
-
               if (!isWebcamMode) {
                 setTimeout(() => {
                   videoBg.play().catch((e) => console.log(e));
                 }, 500);
                 startSyncHeartbeat();
               }
-
-              updateUI(); // Check visibility of tools
+              updateUI();
             }
             if (info === "publish_finished") {
               isPublishing = false;
               publishToggle.textContent = "Start Publish";
               publishToggle.classList.remove("active-red");
               stopSyncHeartbeat();
+              stopPresenterCarousel();
               videoBg.pause();
-
-              updateUI(); // Check visibility of tools
+              updateUI();
             }
             if (info === "data_received") {
               try {
@@ -452,6 +478,7 @@
             publishToggle.textContent = "Start Publish";
             publishToggle.classList.remove("active-red");
             stopSyncHeartbeat();
+            stopPresenterCarousel();
             videoBg.pause();
             updateUI();
           },
@@ -462,12 +489,10 @@
         if (syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(() => {
           if (isPublishing && !isWebcamMode) {
-            const action = isBgPlaying ? "play" : "pause";
-            sendSyncData(action);
+            sendSyncData("sync_status", presenterCarouselIndex);
           }
         }, 2000);
       }
-
       function stopSyncHeartbeat() {
         if (syncInterval) {
           clearInterval(syncInterval);
@@ -486,18 +511,39 @@
         }
       }
 
+      function updateOnAirBadge() {
+        const p = products[presenterCarouselIndex];
+        if (p) onAirProductName.textContent = p.name;
+      }
+
+      function startPresenterCarousel() {
+        if (presenterCarouselInterval) return;
+        presenterCarouselInterval = setInterval(() => {
+          presenterCarouselIndex =
+            (presenterCarouselIndex + 1) % products.length;
+          updateOnAirBadge();
+          sendSyncData("update_product", presenterCarouselIndex);
+        }, 7000);
+      }
+
+      function stopPresenterCarousel() {
+        if (presenterCarouselInterval) {
+          clearInterval(presenterCarouselInterval);
+          presenterCarouselInterval = null;
+        }
+      }
+
       modeToggle.addEventListener("click", () => {
         isWebcamMode = !isWebcamMode;
-
         if (isWebcamMode) {
-          // Pause BG when entering Webcam Mode
+          // --- MODE SWITCH: WEBCAM MODE ---
           videoBg.pause();
           isBgPlaying = false;
           stopSyncHeartbeat();
-          // Force first product selection
-          setManualProduct(0);
+          stopPresenterCarousel(); // <--- FIX: Ferma esplicitamente il timer automatico!
+          setManualProduct(presenterCarouselIndex);
         } else {
-          // Resume BG if publishing when returning to Video Mode
+          // --- MODE SWITCH: VIDEO MODE ---
           if (isPublishing) {
             videoBg.play();
             startSyncHeartbeat();
@@ -511,7 +557,11 @@
         bgToggle.textContent = "Stop Background";
         bgToggle.classList.remove("active-green");
         bgToggle.classList.add("active-red");
-        if (!isWebcamMode) sendSyncData("play");
+        if (!isWebcamMode) {
+          sendSyncData("play", presenterCarouselIndex);
+          startPresenterCarousel();
+        }
+        updateUI();
       });
 
       videoBg.addEventListener("pause", () => {
@@ -519,7 +569,11 @@
         bgToggle.textContent = "Play Background";
         bgToggle.classList.remove("active-red");
         bgToggle.classList.add("active-green");
-        if (!isWebcamMode) sendSyncData("pause");
+        if (!isWebcamMode) {
+          sendSyncData("pause", presenterCarouselIndex);
+          stopPresenterCarousel();
+        }
+        updateUI();
       });
 
       publishToggle.addEventListener("click", () => {
@@ -536,6 +590,7 @@
       resizeCanvas();
       initWebRTC();
       draw();
+      updateOnAirBadge();
     </script>
   </body>
 </html>

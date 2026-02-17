@@ -42,12 +42,9 @@
       .overlay > * {
         pointer-events: auto;
       }
-
-      /* Wishlist Styles */
       .wishlist-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 10px;
         padding: 12px;
@@ -105,12 +102,9 @@
       .wishlist-item-remove:hover {
         background: rgba(220, 38, 38, 0.9);
       }
-
-      /* Carousel & Product Styles */
       .carousel-box {
         background: rgba(0, 0, 0, 0.55);
         backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
         border-radius: 10px;
         padding: 8px 10px;
         display: flex;
@@ -134,11 +128,9 @@
         opacity: 1;
         border-color: #fff;
       }
-
       .product-box {
         background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 10px;
         padding: 12px;
@@ -205,7 +197,6 @@
       .product-btn.remove:hover {
         background: rgba(220, 38, 38, 1);
       }
-
       .connecting {
         position: absolute;
         top: 50%;
@@ -230,20 +221,18 @@
           >
         </div>
       </div>
-
       <div class="carousel-box" id="carouselBox">
         <img id="carouselLeft" src="" alt="carousel" />
         <img id="carouselCenter" class="active" src="" alt="carousel" />
         <img id="carouselRight" src="" alt="carousel" />
       </div>
-
       <div class="product-box" id="productBox">
         <div class="product-top">
           <img class="product-thumb" id="productThumb" src="" alt="product" />
           <div class="product-info">
-            <span class="product-name" id="productName"></span>
-            <span class="product-brand" id="productBrand"></span>
-            <span class="product-price" id="productPrice"></span>
+            <span class="product-name" id="productName"></span
+            ><span class="product-brand" id="productBrand"></span
+            ><span class="product-price" id="productPrice"></span>
           </div>
         </div>
         <div class="product-details" id="productDetails"></div>
@@ -266,9 +255,7 @@
         mediaConstraints: { video: false, audio: false },
         callback: (info, obj) => {
           console.log("Player info:", info, obj);
-          if (info === "initialized") {
-            webRTCAdaptor.play(streamId);
-          }
+          if (info === "initialized") webRTCAdaptor.play(streamId);
           if (info === "newStreamAvailable") {
             isRetrying = false;
             remoteVideo.srcObject = obj.stream;
@@ -279,25 +266,24 @@
             statusEl.textContent = "Stream ended";
             statusEl.style.display = "block";
             document.querySelector(".overlay").style.display = "none";
-            stopCarousel();
           }
           if (info === "data_received") {
             try {
               const data = JSON.parse(obj.data);
 
-              if (data.action === "play") {
-                // From Video Mode: Resume automatic rotation
-                startCarousel();
-              } else if (data.action === "pause") {
-                // From Video Mode: Pause automatic rotation
-                stopCarousel();
-              } else if (data.action === "force_product") {
-                // From Webcam Mode: Stop auto rotation and jump to specific product
-                stopCarousel();
-                carouselIndex = data.index;
-                updateCarousel();
-                updateProduct();
+              // LOGICA "SLAVE": Il player esegue solo ciò che dice il Master
+              if (
+                data.action === "update_product" ||
+                data.action === "force_product" ||
+                data.action === "sync_status"
+              ) {
+                if (data.index !== undefined && data.index !== null) {
+                  carouselIndex = data.index;
+                  updateCarousel();
+                  updateProduct();
+                }
               }
+              // Ignoriamo "play" e "pause" per il carosello, servono solo se volessimo mostrare icone di stato
             } catch (e) {
               console.error(e);
             }
@@ -363,7 +349,6 @@
         "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=200&h=120&fit=crop",
       ];
 
-      // UI Elements
       const imgLeft = document.getElementById("carouselLeft");
       const imgCenter = document.getElementById("carouselCenter");
       const imgRight = document.getElementById("carouselRight");
@@ -377,7 +362,6 @@
 
       let carouselIndex = 0;
       let wishlist = [];
-      let carouselInterval = null;
 
       function getIndex(offset) {
         return (
@@ -437,13 +421,7 @@
         var html = "";
         wishlist.forEach((idx) => {
           var p = products[idx];
-          html += `<div class="wishlist-item">
-            <div class="wishlist-item-info">
-              <span class="wishlist-item-name">${p.name}</span>
-              <span class="wishlist-item-price">${p.brand} — € ${p.price}</span>
-            </div>
-            <button class="wishlist-item-remove" data-index="${idx}">Remove</button>
-          </div>`;
+          html += `<div class="wishlist-item"><div class="wishlist-item-info"><span class="wishlist-item-name">${p.name}</span><span class="wishlist-item-price">${p.brand} — € ${p.price}</span></div><button class="wishlist-item-remove" data-index="${idx}">Remove</button></div>`;
         });
         wishlistItemsEl.innerHTML = html;
         wishlistItemsEl
@@ -477,24 +455,7 @@
         updateWishlistBtn();
       });
 
-      function advanceCarousel() {
-        carouselIndex = (carouselIndex + 1) % carouselSources.length;
-        updateCarousel();
-        updateProduct();
-      }
-
-      function startCarousel() {
-        if (carouselInterval) return;
-        carouselInterval = setInterval(advanceCarousel, 7000);
-      }
-
-      function stopCarousel() {
-        if (carouselInterval) {
-          clearInterval(carouselInterval);
-          carouselInterval = null;
-        }
-      }
-
+      // Avvio Iniziale
       updateCarousel();
       updateProduct();
     </script>
