@@ -210,10 +210,6 @@
         font-size: 12px;
         color: rgba(255, 255, 255, 0.6);
       }
-      .product-price {
-        font-size: 17px;
-        font-weight: 700;
-      }
       .product-details {
         font-size: 11px;
         color: rgba(255, 255, 255, 0.5);
@@ -320,8 +316,7 @@
           <img class="product-thumb" id="productThumb" src="" alt="product" />
           <div class="product-info">
             <span class="product-name" id="productName"></span
-            ><span class="product-brand" id="productBrand"></span
-            ><span class="product-price" id="productPrice"></span>
+            ><span class="product-brand" id="productBrand"></span>
           </div>
         </div>
         <div class="product-details" id="productDetails"></div>
@@ -411,35 +406,30 @@
         {
           name: "Aviator Classic",
           brand: "Ray-Ban",
-          price: "159.00",
           color: "Gold / Green",
           lens: "Polarized G-15",
         },
         {
           name: "Wayfarer Original",
           brand: "Ray-Ban",
-          price: "139.00",
           color: "Black / Crystal",
           lens: "Standard Green",
         },
         {
           name: "Clubmaster Metal",
           brand: "Ray-Ban",
-          price: "179.00",
           color: "Silver / Blue",
           lens: "Gradient Blue",
         },
         {
           name: "Round Double Bridge",
           brand: "Ray-Ban",
-          price: "189.00",
           color: "Bronze / Pink",
           lens: "Mirror Pink",
         },
         {
           name: "Hexagonal Flat",
           brand: "Ray-Ban",
-          price: "169.00",
           color: "Gunmetal / Grey",
           lens: "Polarized Grey",
         },
@@ -457,7 +447,6 @@
       const productThumb = document.getElementById("productThumb");
       const productName = document.getElementById("productName");
       const productBrand = document.getElementById("productBrand");
-      const productPrice = document.getElementById("productPrice");
       const productDetails = document.getElementById("productDetails");
       const wishlistBtn = document.getElementById("wishlistBtn");
       let carouselIndex = 0;
@@ -478,7 +467,6 @@
         productThumb.src = carouselSources[carouselIndex];
         productName.textContent = p.name;
         productBrand.textContent = p.brand;
-        productPrice.textContent = "€ " + p.price;
         productDetails.textContent = "Color: " + p.color + " | Lens: " + p.lens;
         updateWishlistBtn();
       }
@@ -512,7 +500,7 @@
         var html = "";
         wishlist.forEach((idx) => {
           var p = products[idx];
-          html += `<div class="wishlist-item"><div class="wishlist-item-info"><span class="wishlist-item-name">${p.name}</span><span class="wishlist-item-price">${p.brand} — € ${p.price}</span></div><button class="wishlist-item-remove" data-index="${idx}">Remove</button></div>`;
+          html += `<div class="wishlist-item"><div class="wishlist-item-info"><span class="wishlist-item-name">${p.name}</span><span class="wishlist-item-price">${p.brand}</span></div><button class="wishlist-item-remove" data-index="${idx}">Remove</button></div>`;
         });
         wishlistItemsEl.innerHTML = html;
         wishlistItemsEl
